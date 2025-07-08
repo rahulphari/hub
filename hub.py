@@ -1,5 +1,4 @@
-# hub_app.py - Final Version 4.9.4
-# This version corrects the volume unit conversion from cubic feet to cubic centimeters.
+# hub_app.py - Final Version (No AI Summary)
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -19,11 +18,11 @@ CORS(app)
 
 # --- Global variables & Constants ---
 APP_START_TIME = datetime.now()
-BACKEND_VERSION = "4.9.4_UNIT_CONVERSION_FINAL" 
+BACKEND_VERSION = "5.1.0_NO_AI_SUMMARY" 
 TOTAL_ANALYSES_PERFORMED = 0
 LAST_ANALYSIS_TIME = "Never"
 
-# --- Definitive Mappings ---
+# --- Definitive Mappings (No changes from original) ---
 LANE_MAP = {
     'Coimbatore_Pudhupalayam_GW': 'FTL', 'Mangalore_Katipalla_H': 'FTL', 'Hassan_Nagathavalli_I': 'FTL',
     'Gurgaon_Tauru_GW': 'FTL', 'Davangere_Industrialarea_I': 'FTL', 'Pune_Sudhwadi_GW': 'FTL',
@@ -69,7 +68,7 @@ VEHICLE_CAPACITY_MAP = {
 SANITIZED_LANE_MAP = {key.strip().upper(): value for key, value in LANE_MAP.items()}
 SANITIZED_NTC_VEHICLE_MAP = {key.strip().upper(): value for key, value in NTC_VEHICLE_MAP.items()}
 
-# --- Helper Functions ---
+# --- Helper Functions (No changes from original) ---
 def clean_bag_id(bag_id):
     if isinstance(bag_id, str): return bag_id.lstrip("'")
     return bag_id
@@ -120,7 +119,7 @@ def format_etd_string(etd, current_time):
     total_hours = days * 24 + int(hours)
     return f"Next connection in {total_hours} hours {int(minutes)} mins"
 
-# --- Insight Generation Functions ---
+# --- Insight Generation Functions (No changes from original) ---
 def get_ntc_breakdown(lane_type_df, current_time):
     if lane_type_df.empty: return []
     ntc_summary = lane_type_df.groupby('ntc_used').agg(total_wbns=('bag_id', 'count'), next_etd=('etd', 'min')).reset_index()
@@ -267,8 +266,6 @@ def hub_analytics_api():
         for col in ['package_count', 'bag_wt', 'bag_vol']: 
             if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(1 if col == 'package_count' else 0)
         
-        # *** CORRECTED UNIT CONVERSION FIX ***
-        # Convert bag volume from cubic feet (ft^3) to cubic centimeters (cm^3)
         if 'bag_vol' in df.columns:
             df['bag_vol'] = df['bag_vol'] * 28316.8
 
@@ -331,6 +328,3 @@ def get_hub_backend_status():
     hours, remainder = divmod(uptime_seconds, 3600); minutes, _ = divmod(remainder, 60)
     uptime_str = f"{int(hours)}h {int(minutes)}m"
     return jsonify({"status": "online", "version": BACKEND_VERSION, "uptime": uptime_str, "last_analysis_time": LAST_ANALYSIS_TIME, "total_analyses": TOTAL_ANALYSES_PERFORMED}), 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5002, debug=True)
