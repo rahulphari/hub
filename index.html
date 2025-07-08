@@ -296,7 +296,7 @@
                 reader.onload = async (e) => {
                     try {
                         const fileDate = new Date(file.lastModified);
-                        const response = await fetch('https://hub-analytics-backend.onrender.com/api/hub-analytics', {
+                        const response = await fetch('https://hub-cuur.onrender.com/api/hub-analytics', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ csv_content: e.target.result, file_timestamp: fileDate.toISOString() })
