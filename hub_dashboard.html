@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hub In-Center Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; background-color: #f0f2f5; }
+        .container { max-width: 1800px; margin: 1.5rem auto; padding: 1.5rem; }
+        .dashboard-header {
+            background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 2rem;
+            border-radius: 0.75rem; margin-bottom: 2rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .card {
+            background-color: #ffffff; border-radius: 0.75rem; padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .metric-card {
+            @apply text-center p-6 rounded-lg shadow-lg cursor-pointer transition-all duration-300;
+            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .metric-card:hover {
+            @apply transform -translate-y-1;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+        }
+        .metric-value { @apply text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300; }
+        .metric-label { @apply text-sm font-bold uppercase text-blue-200 mt-1; }
+        .newsboard { background: #1f2937; color: #d1d5db; }
+        .ntc-table, .utilization-table { width: 100%; border-collapse: collapse; }
+        .ntc-table th, .ntc-table td, .utilization-table th, .utilization-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #4b5563; font-size: 0.8rem; }
+        .ntc-table th, .utilization-table th { background-color: #374151; color: #ffffff; font-weight: 600; padding-top: 0.5rem; padding-bottom: 0.5rem; }
+        .utilization-table td { vertical-align: top; }
+        .clickable-cell { @apply cursor-pointer transition-all duration-200; position: relative; }
+        .clickable-cell:hover { background-color: #dbeafe; color: #1e40af; font-weight: 600; }
+        .clickable-cell:hover::after { content: ''; position: absolute; left: 0.75rem; right: 0.75rem; bottom: 0.25rem; height: 1px; background-color: #1e40af; }
+        .summary-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
+        .summary-card { @apply p-4 rounded-lg text-center cursor-pointer transition-all duration-300; }
+        .summary-card:hover { @apply transform -translate-y-1 shadow-xl ring-2 ring-blue-500; }
+        .data-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        .data-table th { @apply p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer select-none transition-colors duration-200; }
+        .data-table th:hover { @apply bg-gray-200 text-black; }
+        .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.875rem; vertical-align: top; }
+        .insight-alert { @apply text-sm list-item; }
+        
+        /* New Loader Styles */
+        #loadingOverlay {
+            transition: opacity 0.3s ease-in-out;
+        }
+        .progress-bar-container {
+            width: 80%; max-width: 600px; background-color: #374151; border-radius: 0.5rem; overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .progress-bar {
+            height: 1.5rem;
+            background: linear-gradient(90deg, #3b82f6, #10b981);
+            width: 0%;
+        }
+        @keyframes loading-animation {
+            0% { width: 0%; }
+            100% { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex flex-col items-center justify-center transition-opacity duration-300">
+        <div class="progress-bar-container mb-6">
+            <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <p id="loadingMessage" class="text-white text-xl font-semibold text-center px-4 w-full max-w-2xl"></p>
+    </div>
+
+    <!-- Copy Modal -->
+    <div id="copyModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-xl font-bold mb-4">Select Data to Copy</h3>
+            <div id="copy-columns-container" class="grid grid-cols-2 gap-2 mb-6">
+                <!-- Checkboxes will be inserted here by JS -->
+            </div>
+            <div class="flex justify-end space-x-4">
+                <button id="closeCopyModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Cancel</button>
+                <button id="confirmCopyBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Copy Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header text-center relative">
+            <h1 class="text-4xl font-bold">Hub In-Center Analytics</h1>
+            <p id="fileTimestamp" class="text-blue-200 text-lg">Instant Analytics for Peak Hub Performance</p>
+        </div>
+        <div id="uploadSection" class="card mb-6">
+             <div class="flex items-center space-x-4">
+                <input type="file" id="fileUpload" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg cursor-pointer">
+                <button id="analyzeButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">Analyze</button>
+            </div>
+            <p class="text-xs text-gray-500 mt-3">
+                For accurate results, download the most recent Outbound EP file from 
+                <a href="https://eye.delhivery.com/#/dashboard?tab=outbound" target="_blank" class="text-blue-600 hover:underline">Delhivery Eye</a>.
+            </p>
+            <div id="messageArea" class="mt-4 text-center"></div>
+        </div>
+
+        <div id="welcomeSection" class="card mb-6 bg-gray-50">
+            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Welcome to Your Hub Analytics Co-Pilot!</h2>
+            <p class="text-center text-gray-600 mb-8">Upload your Outbound EP file to unlock powerful, real-time insights.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 text-center">
+                <div class="p-4">
+                    <div class="text-4xl mb-2">📊</div>
+                    <h3 class="font-bold text-lg">Instant KPIs</h3>
+                    <p class="text-sm text-gray-600">Get a live pulse on your hub's performance with key metrics like PUT %, TruPUT %, and total load.</p>
+                </div>
+                <div class="p-4">
+                    <div class="text-4xl mb-2">🔍</div>
+                    <h3 class="font-bold text-lg">Deep Dive</h3>
+                    <p class="text-sm text-gray-600">Click on any metric or category to instantly filter and view a detailed list of the underlying shipments and bags.</p>
+                </div>
+                 <div class="p-4">
+                    <div class="text-4xl mb-2">🪄</div>
+                    <h3 class="font-bold text-lg">Magic Filter</h3>
+                    <p class="text-sm text-gray-600">Create custom, multi-layered rules to slice and dice your data exactly the way you need it.</p>
+                </div>
+                <div class="p-4">
+                    <div class="text-4xl mb-2">✨</div>
+                    <h3 class="font-bold text-lg">AI-Powered Insights</h3>
+                    <p class="text-sm text-gray-600">Use the Gemini-powered summary to get actionable recommendations and identify bottlenecks in seconds.</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="resultsDisplay" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="card bg-gray-800 text-white">
+                        <h2 class="text-2xl font-black text-center mb-6 uppercase tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">Key Performance Indicators</h2>
+                        <div id="kpi-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div id="put-compliance-card" class="metric-card"><div id="putCompliance" class="metric-value">0%</div><div class="metric-label">PUT %</div></div>
+                            <div id="truput-card" class="metric-card"><div id="truput" class="metric-value">0%</div><div class="metric-label">TruPUT %</div></div>
+                            <div id="load-card" class="metric-card"><div id="loadInCenter" class="metric-value">0</div><div class="metric-label">Load In Center</div></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-bold mb-4">In-Center Breakdown</h3>
+                        <div class="space-y-6">
+                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Product Type</h4><div id="pdtBreakdown" class="summary-card-grid"></div></div>
+                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Priority</h4><div id="priorityBreakdown" class="summary-card-grid"></div></div>
+                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Ageing</h4><div id="ageingBreakdown" class="summary-card-grid"></div></div>
+                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By PUT Status</h4><div id="putStatusBreakdown" class="summary-card-grid"></div></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <h3 class="text-lg font-bold">🪄 Magic Filter</h3>
+                        <div class="my-4">
+                            <div id="filter-rules-container" class="space-y-3"></div>
+                            <button id="add-rule-btn" class="mt-4 text-sm bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-md">+ Add Rule</button>
+                        </div>
+                         <div class="flex items-center justify-between mt-4 bg-gray-50 p-3 rounded-md">
+                             <div><span class="font-semibold">Match</span><select id="filter-logic-selector" class="p-1 border rounded-md"><option value="AND">ALL</option><option value="OR">ANY</option></select><span class="font-semibold">rules.</span></div>
+                            <button id="apply-magic-filter-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Apply</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="lg:col-span-1 space-y-6">
+                    <div class="card"><h3 class="text-lg font-bold mb-2">NTC Breakdown (FTL Lanes)</h3><div id="ftlBreakdown" class="max-h-[600px] overflow-y-auto"></div></div>
+                    <div class="card"><h3 class="text-lg font-bold mb-2">NTC Breakdown (Carting Lanes)</h3><div id="cartingBreakdown" class="max-h-[600px] overflow-y-auto"></div></div>
+                </div>
+                <div class="lg:col-span-1 card newsboard"><h2 class="text-2xl font-bold text-white border-b border-gray-600 pb-2 mb-4">Insights & Alerts</h2><div id="insights-container" class="space-y-6"></div></div>
+            </div>
+            <div class="card mt-6">
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-xl font-bold text-gray-800" id="dynamicViewTitle">Detailed View</h2>
+                     <div class="flex space-x-2">
+                        <button id="copyDataBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            📋 Copy
+                        </button>
+                        <button id="generateSummaryBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                            ✨ Generate AI Summary
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-x-auto" id="dynamicDisplayBoard"><p class="text-gray-500" id="dynamic-view-placeholder">Click on any metric, category, or number to see detailed data here.</p></div>
+                <div id="summaryContainer" class="mt-6 p-4 border-t border-gray-200 hidden bg-gray-50 rounded-lg">
+                    <h3 class="text-lg font-bold text-gray-800 mb-2">✨ AI-Powered Summary</h3>
+                    <div id="summaryContent" class="text-gray-700 whitespace-pre-wrap prose"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script id="main-script">
+    function initializeApp() {
+        // Existing DOM element selections...
+        const fileUploadInput = document.getElementById('fileUpload'), analyzeButton = document.getElementById('analyzeButton'), messageArea = document.getElementById('messageArea');
+        const resultsDisplay = document.getElementById('resultsDisplay'), fileTimestampEl = document.getElementById('fileTimestamp'), dynamicDisplayBoard = document.getElementById('dynamicDisplayBoard');
+        const dynamicViewTitle = document.getElementById('dynamicViewTitle'), dynamicViewPlaceholder = document.getElementById('dynamic-view-placeholder');
+        const addRuleBtn = document.getElementById('add-rule-btn'), filterRulesContainer = document.getElementById('filter-rules-container'), applyMagicFilterBtn = document.getElementById('apply-magic-filter-btn');
+        const loadingOverlay = document.getElementById('loadingOverlay'), loadingMessage = document.getElementById('loadingMessage'), progressBar = document.getElementById('progressBar');
+        const generateSummaryBtn = document.getElementById('generateSummaryBtn'), summaryContainer = document.getElementById('summaryContainer'), summaryContent = document.getElementById('summaryContent');
+        const welcomeSection = document.getElementById('welcomeSection');
+        
+        // New DOM elements for Copy functionality
+        const copyDataBtn = document.getElementById('copyDataBtn');
+        const copyModal = document.getElementById('copyModal');
+        const closeCopyModalBtn = document.getElementById('closeCopyModalBtn');
+        const confirmCopyBtn = document.getElementById('confirmCopyBtn');
+        const copyColumnsContainer = document.getElementById('copy-columns-container');
+
+        let currentSortKey = 'age_hours', isSortAscending = false, messageInterval;
+        let currentlyRenderedData = [];
+
+        // Existing event listeners...
+        analyzeButton.addEventListener('click', handleAnalysis);
+        addRuleBtn.addEventListener('click', () => createFilterRule());
+        applyMagicFilterBtn.addEventListener('click', applyMagicFilter);
+        generateSummaryBtn.addEventListener('click', generateReportSummary);
+
+        // New event listeners for Copy functionality
+        copyDataBtn.addEventListener('click', openCopyModal);
+        closeCopyModalBtn.addEventListener('click', () => copyModal.classList.add('hidden'));
+        confirmCopyBtn.addEventListener('click', copySelectedData);
+        
+        const loadingMessages = [
+            "Analyzing data integrity...",
+            "Did you know? You can click any number in the NTC tables to filter the detailed view.",
+            "Generating key performance indicators...",
+            "Did you know? The Magic Filter lets you combine multiple rules to find exactly what you're looking for.",
+            "Cross-referencing NTC and ETD data...",
+            "Did you know? The AI Summary uses Gemini to give you actionable insights on the filtered data.",
+            "Building interactive breakdown cards...",
+            "Pro Tip: Check the 'Imminent Departures' insight to prioritize shipments for connections leaving soon.",
+            "Assembling the Insights & Alerts panel...",
+            "Fun Fact: This dashboard was co-created with AI to bring you the best possible analytics experience!",
+            "Finalizing the dashboard..."
+        ];
+
+        function showLoader(duration = 8000) {
+            loadingOverlay.classList.remove('hidden');
+            progressBar.style.animation = 'none';
+            progressBar.offsetHeight; // Trigger reflow to restart animation
+            progressBar.style.animation = `loading-animation ${duration / 1000}s linear forwards`;
+
+            let msgIndex = 0;
+            loadingMessage.textContent = loadingMessages[msgIndex];
+            messageInterval = setInterval(() => {
+                msgIndex = (msgIndex + 1) % loadingMessages.length;
+                loadingMessage.textContent = loadingMessages[msgIndex];
+            }, 2000);
+        }
+
+        function hideLoader() {
+            loadingOverlay.classList.add('hidden');
+            clearInterval(messageInterval);
+        }
+        
+        function formatTimeAgo(date) {
+            const now = new Date();
+            const seconds = Math.round((now - date) / 1000);
+            const minutes = Math.round(seconds / 60);
+            const hours = Math.round(minutes / 60);
+            const days = Math.round(hours / 24);
+
+            if (seconds < 60) return "just now";
+            if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+            if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+            return `${days} day${days > 1 ? 's' : ''} ago`;
+        }
+
+        function showMessage(message, isError = false, duration = 5000) {
+            messageArea.innerHTML = message;
+            messageArea.className = `mt-4 text-center p-2 rounded-md transition-opacity duration-300 ${isError ? 'text-red-800 bg-red-100' : 'text-green-800 bg-green-100'}`;
+            setTimeout(() => {
+                messageArea.classList.add('opacity-0');
+            }, duration - 500);
+             setTimeout(() => {
+                messageArea.innerHTML = '';
+                messageArea.classList.remove('opacity-0');
+            }, duration);
+        }
+        
+        async function handleAnalysis() {
+            const file = fileUploadInput.files[0];
+            if (!file) { showMessage('Please select a file first.', true); return; }
+            
+            const minLoadingTime = 8000;
+            showLoader(minLoadingTime);
+            welcomeSection.classList.add('hidden');
+            resultsDisplay.classList.add('hidden');
+            analyzeButton.disabled = true;
+            messageArea.innerHTML = '';
+            summaryContainer.classList.add('hidden');
+
+            const analysisPromise = new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const fileDate = new Date(file.lastModified);
+                        const response = await fetch('http://127.0.0.1:5002/api/hub-analytics', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ csv_content: e.target.result, file_timestamp: fileDate.toISOString() })
+                        });
+                        const resData = await response.json();
+                        if (!response.ok) { throw new Error(resData.error || 'Analysis failed.'); }
+                        
+                        window.currentAnalysisData = resData;
+                        const formattedDate = fileDate.toLocaleString('en-US', { hour12: true, dateStyle: 'long', timeStyle: 'medium' });
+                        fileTimestampEl.textContent = `Data from: ${formattedDate}`;
+                        
+                        renderDashboard(window.currentAnalysisData);
+                        applyFiltersAndRender([]); 
+                        filterRulesContainer.innerHTML = '';
+                        createFilterRule();
+                        
+                        const timeAgo = formatTimeAgo(fileDate);
+                        showMessage(`<strong>Analysis Complete.</strong> Displaying data from "<em>${file.name}</em>" (file is ${timeAgo}).`, false);
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = (error) => reject(error);
+                reader.readAsText(file);
+            });
+
+            const timerPromise = new Promise(resolve => setTimeout(resolve, minLoadingTime));
+
+            try {
+                await Promise.all([analysisPromise, timerPromise]);
+                resultsDisplay.classList.remove('hidden');
+            } catch (error) {
+                showMessage(`<strong>Error:</strong> ${error.message}`, true);
+                welcomeSection.classList.remove('hidden');
+            } finally {
+                hideLoader();
+                analyzeButton.disabled = false;
+            }
+        }
+
+        function applyFiltersAndRender(filters) {
+            let filteredData = window.currentAnalysisData.detailed_data;
+            let titleParts = [];
+            if (filters.length > 0) {
+                filters.forEach(filter => {
+                    let key = filter.key, value = filter.value, op = filter.op || '==';
+                    titleParts.push(`${(filter.label || key).replace(/_/g,' ')} ${op.replace('==','=')} ${value}`);
+                    filteredData = filteredData.filter(row => {
+                        if (!row || row[key] === null || row[key] === undefined) return false;
+                        const rowValue = row[key];
+                        switch(op) {
+                            case '>': return rowValue > value; case '>=': return rowValue >= value;
+                            case '<': return rowValue < value; case '<=': return rowValue <= value;
+                            case '!=': return rowValue != value;
+                            case 'contains': return String(rowValue).toLowerCase().includes(String(value).toLowerCase());
+                            default: return rowValue == value;
+                        }
+                    });
+                });
+            }
+            
+            let shipmentCount = 0;
+            let bagCount = 0;
+            filteredData.forEach(row => {
+                if (row.bag_id && /^\d+$/.test(row.bag_id)) {
+                    shipmentCount++;
+                } else {
+                    bagCount++;
+                }
+            });
+            const countText = `(${shipmentCount} Shipments | ${bagCount} Bags)`;
+
+            if (filters.length > 0) {
+                 dynamicViewTitle.textContent = `Detailed View: ${titleParts.join(' AND ')} ${countText}`;
+            } else {
+                 dynamicViewTitle.textContent = `Detailed View: All In-Center Shipments ${countText}`;
+            }
+
+            renderDetailedTable(filteredData);
+        }
+        
+        function renderDashboard(data) {
+            document.getElementById('putCompliance').textContent = data.key_metrics.put_compliance;
+            document.getElementById('truput').textContent = data.key_metrics.truput;
+            document.getElementById('loadInCenter').textContent = data.key_metrics.load_in_center;
+            document.getElementById('load-card').onclick = () => applyFiltersAndRender([]);
+            document.getElementById('put-compliance-card').onclick = () => applyFiltersAndRender([{ key: 'age_hours', op: '>', value: 2, label: 'PUT % contributors' }]);
+            document.getElementById('truput-card').onclick = () => applyFiltersAndRender([{ key: 'put_status', op: '!=', value: 'Put Pending', label: 'TruPUT contributors' }]);
+            renderBreakdownCards('pdtBreakdown', data.breakdowns.pdt, 'bg-green-50 text-green-800', 'pdt');
+            renderBreakdownCards('priorityBreakdown', data.breakdowns.priority, 'bg-yellow-50 text-yellow-800', 'priority');
+            renderBreakdownCards('putStatusBreakdown', data.breakdowns.put_status, 'bg-blue-50 text-blue-800', 'put_status');
+            renderBreakdownCards('ageingBreakdown', data.breakdowns.ageing, 'bg-red-50 text-red-800', 'ageing_breakdown');
+            renderNtcTable('ftlBreakdown', data.ntc_breakdowns.ftl, 'FTL');
+            renderNtcTable('cartingBreakdown', data.ntc_breakdowns.carting, 'Carting');
+            if(data.insights) renderInsights(data.insights);
+        }
+
+        function renderBreakdownCards(elementId, breakdownData, colorClasses, filterKey) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            const keyOrder = { 'ageingBreakdown': ['<24 hrs', '24-48 hrs', '48-72 hrs', '72+ hrs'] };
+            const sortedKeys = keyOrder[elementId] || Object.keys(breakdownData).sort();
+            for (const key of sortedKeys) {
+                if (!breakdownData.hasOwnProperty(key)) continue;
+                const card = document.createElement('div');
+                card.className = `summary-card ${colorClasses}`;
+                card.onclick = () => applyFiltersAndRender([{ key: filterKey, value: key }]);
+                card.innerHTML = `<div class="font-semibold text-sm">${key}</div><div class="font-bold text-xl">${breakdownData[key]}</div>`;
+                container.appendChild(card);
+            }
+        }
+        
+        function renderNtcTable(elementId, ntcData, title) {
+            const container = document.getElementById(elementId);
+            if (!ntcData || ntcData.length === 0) {
+                container.innerHTML = `<p class="text-gray-500 text-center p-4">No ${title} lane data available.</p>`;
+                return;
+            }
+
+            const table = document.createElement('table');
+            table.className = 'ntc-table';
+            table.innerHTML = `<thead><tr><th>NTC</th><th>Total</th><th>&lt;24 hrs</th><th>24+ hrs</th><th>Bags in Docks</th></tr></thead>`;
+            
+            const tableBody = document.createElement('tbody');
+            ntcData.forEach(row => {
+                const tr = document.createElement('tr');
+
+                const ntcCell = document.createElement('td');
+                ntcCell.className = 'clickable-cell font-semibold';
+                ntcCell.innerHTML = `${row.ntc_used}<div class="text-xs text-gray-500 font-normal italic">${row.etd_string || ''}</div>`;
+                ntcCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
+                tr.appendChild(ntcCell);
+
+                const totalCell = document.createElement('td');
+                totalCell.className = 'clickable-cell text-center';
+                totalCell.textContent = row.total_wbns;
+                totalCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
+                tr.appendChild(totalCell);
+
+                const lessThan24Cell = document.createElement('td');
+                lessThan24Cell.className = 'clickable-cell text-center';
+                lessThan24Cell.textContent = row['<24 hrs'] || 0;
+                lessThan24Cell.onclick = () => applyFiltersAndRender([
+                    { key: "ntc_used", value: row.ntc_used },
+                    { key: "age_hours", op: '<', value: 24, label: 'age' }
+                ]);
+                tr.appendChild(lessThan24Cell);
+                
+                const over24Value = (row['24-48 hrs'] || 0) + (row['48-72 hrs'] || 0) + (row['72+ hrs'] || 0);
+                const over24Cell = document.createElement('td');
+                over24Cell.className = 'clickable-cell text-center';
+                over24Cell.textContent = over24Value;
+                over24Cell.onclick = () => applyFiltersAndRender([
+                    { key: "ntc_used", value: row.ntc_used },
+                    { key: "age_hours", op: '>=', value: 24, label: 'age' }
+                ]);
+                tr.appendChild(over24Cell);
+
+                const docksCell = document.createElement('td');
+                docksCell.className = 'clickable-cell text-center font-bold';
+                docksCell.textContent = row.bags_in_docks || 0;
+                docksCell.onclick = () => applyFiltersAndRender([
+                    { key: "ntc_used", value: row.ntc_used }, 
+                    { key: "put_status", value: "Docks" }
+                ]);
+                tr.appendChild(docksCell);
+                
+                tableBody.appendChild(tr);
+            });
+            
+            table.appendChild(tableBody);
+            container.innerHTML = '';
+            container.appendChild(table);
+        }
+
+        function renderDetailedTable(data) {
+            currentlyRenderedData = data;
+            dynamicViewPlaceholder.style.display = 'none';
+            if (!data || data.length === 0) { 
+                dynamicDisplayBoard.innerHTML = '<p class="text-gray-500 p-4">No detailed data for this selection.</p>'; 
+                copyDataBtn.disabled = true;
+                generateSummaryBtn.disabled = true;
+                return; 
+            }
+            copyDataBtn.disabled = false;
+            generateSummaryBtn.disabled = false;
+
+            const sortData = (data, key, ascending) => {
+                return [...data].sort((a, b) => {
+                    const valA = a[key], valB = b[key];
+                    if (valA === null || valA === undefined) return 1; if (valB === null || valB === undefined) return -1;
+                    if (typeof valA === 'number' && typeof valB === 'number') return ascending ? valA - valB : valB - valA;
+                    return String(valA).localeCompare(String(valB), undefined, {numeric: true}) * (ascending ? 1 : -1);
+                });
+            };
+            const sortedData = sortData(data, currentSortKey, isSortAscending);
+            const headers = ['BAG ID', 'NTC', 'AGE', 'PUT STATUS', 'INCOMING TIME'];
+            const headerKeys = {'BAG ID': 'bag_id', 'NTC': 'ntc_used', 'AGE': 'age_hours', 'PUT STATUS': 'put_status', 'INCOMING TIME': 'incoming_time_dt'};
+            const table = document.createElement('table');
+            table.className = 'data-table';
+            const thead = document.createElement('thead');
+            let headerRowHtml = '<tr>';
+            headers.forEach(h => {
+                const sortIndicator = headerKeys[h] === currentSortKey ? (isSortAscending ? ' ▲' : ' ▼') : '';
+                headerRowHtml += `<th data-sort-key="${headerKeys[h]}">${h}${sortIndicator}</th>`;
+            });
+            headerRowHtml += '</tr>';
+            thead.innerHTML = headerRowHtml;
+            const tbody = document.createElement('tbody');
+            sortedData.forEach(row => {
+                const tr = document.createElement('tr');
+                headers.forEach(h => {
+                    const td = document.createElement('td');
+                    let cellContent = '';
+                    switch (h) {
+                        case 'BAG ID':
+                            const id = row.bag_id; const isShipment = /^\d+$/.test(id);
+                            const url = isShipment ? `https://hq.delhivery.com/p/pntrzz/${id}/` : `https://hq.delhivery.com/bag/${id}/`;
+                            cellContent = `<div><a href="${url}" target="_blank" class="text-blue-600 hover:underline font-semibold">${id}</a></div>
+                                         <div class="text-xs text-gray-600">(${row.pdt} | ${row.priority})</div>`;
+                            break;
+                        case 'NTC': cellContent = row.ntc_used; break;
+                        case 'AGE': cellContent = row.age_str; break;
+                        case 'PUT STATUS': cellContent = `<div class="font-semibold">${row.put_status}</div><div class="text-xs text-gray-500">${row.putaway_location || 'N/A'}</div>`; break;
+                        case 'INCOMING TIME': cellContent = row.incoming_time_dt ? new Date(row.incoming_time_dt).toLocaleString() : 'N/A'; break;
+                        default: cellContent = 'N/A';
+                    }
+                    td.innerHTML = cellContent;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            dynamicDisplayBoard.innerHTML = '';
+            dynamicDisplayBoard.appendChild(table);
+            dynamicDisplayBoard.querySelectorAll('th').forEach(th => {
+                th.addEventListener('click', () => {
+                    const newSortKey = th.dataset.sortKey;
+                    if (currentSortKey === newSortKey) { isSortAscending = !isSortAscending; } 
+                    else { currentSortKey = newSortKey; isSortAscending = true; }
+                    renderDetailedTable(data);
+                });
+            });
+        }
+        
+        async function generateReportSummary() {
+            if (currentlyRenderedData.length === 0) {
+                showMessage('No data in the detailed view to summarize.', true);
+                return;
+            }
+
+            summaryContainer.classList.remove('hidden');
+            summaryContent.innerHTML = '<p class="text-center animate-pulse">✨ Generating summary with Gemini...</p>';
+            generateSummaryBtn.disabled = true;
+
+            const dataForSummary = currentlyRenderedData.slice(0, 50).map(row => ({
+                ntc: row.ntc_used,
+                age: row.age_str,
+                put_status: row.put_status,
+                priority: row.priority
+            }));
+
+            const prompt = `
+                You are a logistics operations expert. Based on the following sample of ${currentlyRenderedData.length} shipments from a hub's detailed view, provide a concise summary of the key operational issues and suggest 2-3 clear, actionable steps.
+
+                Focus on identifying:
+                - Potential bottlenecks (e.g., many items with 'Put Pending' status).
+                - High-priority items that need immediate attention (e.g., high age, high priority).
+                - Any other significant patterns or risks.
+
+                Data Sample:
+                ${JSON.stringify(dataForSummary, null, 2)}
+
+                Please format your response with a "Key Observations" section and an "Actionable Steps" section. Use bullet points.
+            `;
+
+            try {
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                const payload = { contents: chatHistory };
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    throw new Error(`API request failed with status ${response.status}: ${errorBody}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const summaryText = result.candidates[0].content.parts[0].text;
+                    summaryContent.innerHTML = summaryText.replace(/\*/g, '•');
+                } else {
+                    console.error("Unexpected API response format:", result);
+                    throw new Error('Unexpected response format from the Gemini API.');
+                }
+
+            } catch (error) {
+                console.error("Error generating summary:", error);
+                summaryContent.innerHTML = `<p class="text-red-500"><strong>Error generating summary:</strong> ${error.message}</p>`;
+            } finally {
+                generateSummaryBtn.disabled = false;
+            }
+        }
+
+        // --- Start of New Copy Functionality ---
+
+        const copyableColumns = {
+            'bag_id': 'Bag/Shipment ID',
+            'ntc_used': 'NTC',
+            'age_str': 'Age',
+            'put_status': 'PUT Status',
+            'putaway_location': 'PUT Location',
+            'pdt': 'Product Type',
+            'priority': 'Priority',
+            'incoming_time_dt': 'Incoming Time'
+        };
+
+        function openCopyModal() {
+            copyColumnsContainer.innerHTML = ''; // Clear previous checkboxes
+            Object.entries(copyableColumns).forEach(([key, label]) => {
+                const isChecked = ['bag_id', 'ntc_used', 'age_str', 'put_status'].includes(key); // Default selection
+                const checkboxHtml = `
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" value="${key}" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${isChecked ? 'checked' : ''}>
+                        <span class="text-gray-700">${label}</span>
+                    </label>
+                `;
+                copyColumnsContainer.insertAdjacentHTML('beforeend', checkboxHtml);
+            });
+            copyModal.classList.remove('hidden');
+        }
+
+        function copySelectedData() {
+            const selectedColumns = Array.from(copyColumnsContainer.querySelectorAll('input:checked')).map(cb => cb.value);
+            if (selectedColumns.length === 0) {
+                alert("Please select at least one column to copy.");
+                return;
+            }
+
+            const headerText = dynamicViewTitle.textContent;
+            
+            let textToCopy = `${headerText}\n\n`;
+            
+            // Add headers
+            textToCopy += selectedColumns.map(key => copyableColumns[key]).join('\t') + '\n';
+            
+            // Add data rows
+            currentlyRenderedData.forEach(row => {
+                const rowData = selectedColumns.map(key => {
+                    let value = row[key] || 'N/A';
+                    if (key === 'incoming_time_dt') {
+                        value = value ? new Date(value).toLocaleString() : 'N/A';
+                    }
+                    return value;
+                });
+                textToCopy += rowData.join('\t') + '\n';
+            });
+
+            copyTextToClipboard(textToCopy);
+            copyModal.classList.add('hidden');
+        }
+
+        function copyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.style.position = 'fixed';
+            textArea.style.top = '-9999px';
+            textArea.style.left = '-9999px';
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showMessage('Copied to clipboard!', false, 3000);
+            } catch (err) {
+                showMessage('Failed to copy.', true, 3000);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // --- End of New Copy Functionality ---
+
+        function renderInsights(insights) {
+            const container = document.getElementById('insights-container');
+            container.innerHTML = ''; 
+            const insightOrder = ['put_predictor', 'imminent_departures', 'load_analysis', 'carting_at_docks', 'unknown_ntcs'];
+            
+            const createClickableSpan = (text, filters, colorClass) => {
+                const span = document.createElement('span');
+                span.className = `font-bold underline cursor-pointer ${colorClass}`;
+                span.textContent = text;
+                span.onclick = () => applyFiltersAndRender(filters);
+                return span;
+            };
+
+            const renderFunctions = {
+                put_predictor: (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-blue-400">PUT Predictor</h3>`;
+                    const contentDiv = document.createElement('div');
+                    contentDiv.className = 'text-sm mt-2 space-y-3'; let hasContent = false;
+                    if (data.at_risk_15m.count > 0 || data.at_risk_30m.count > 0) {
+                        const p1 = document.createElement('p');
+                        p1.append(createClickableSpan(data.total_pending, [{key: 'put_status', value: 'Put Pending'}], 'text-white'));
+                        p1.innerHTML += ` PUT PENDING of which `;
+                        p1.append(createClickableSpan(data.at_risk_15m.count, [{key: 'put_status', value: 'Put Pending'}, {key: 'age_hours', op: '>=', value: 1.75}, {key: 'age_hours', op: '<', value: 2.0}], 'text-yellow-300'));
+                        p1.innerHTML += ` will cross 2hr in next 15 mins. PUT % may drop by <span class="font-bold text-red-400">${data.at_risk_15m.put_drop}</span>.`;
+                        contentDiv.appendChild(p1); hasContent = true;
+                    }
+                    if (data.critical_4h_plus.count > 0) {
+                        const p2 = document.createElement('p');
+                        p2.append(createClickableSpan(data.critical_4h_plus.count, [{key: 'put_status', value: 'Put Pending'}, {key: 'age_hours', op: '>', value: 4}], 'text-red-400'));
+                        p2.innerHTML += ` shipments are PUT PENDING for >4 hours. <span class="font-bold text-red-500">Track immediately.</span>`;
+                        contentDiv.appendChild(p2); hasContent = true;
+                    }
+                    if (data.target_rate.needed) {
+                        const p3 = document.createElement('p');
+                        p3.className = 'text-green-300';
+                        p3.innerHTML = `🎯 To reach 95% PUT, <span class="font-bold text-white">${data.target_rate.rate}</span> shipments from the >2hr backlog must be cleared.`;
+                        contentDiv.appendChild(p3); hasContent = true;
+                    }
+                    if (!hasContent) { contentDiv.innerHTML = `<p class="text-green-300">✅ No immediate PUT risks detected.</p>`; }
+                    wrapper.appendChild(contentDiv); return wrapper;
+                },
+                imminent_departures: (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-orange-400">Imminent Departures at Risk</h3>`;
+                    if(!data || data.length === 0) { wrapper.innerHTML += `<p class="text-sm mt-2 text-green-300">✅ No pending shipments for imminent departures.</p>`; return wrapper; }
+                    const table = document.createElement('table');
+                    table.className = 'w-full text-left text-xs mt-2';
+                    table.innerHTML = `<thead><tr class="border-b border-gray-600"><th class="py-1">NTC</th><th class="py-1 text-center">Pending</th><th class="py-1">Departs In</th><th class="py-1">Recommendation</th></tr></thead>`;
+                    const tbody = document.createElement('tbody');
+                    data.forEach(item => {
+                        let recColor = 'text-gray-300';
+                        if(item.recommendation === 'High Priority Put') recColor = 'text-yellow-400';
+                        if(item.recommendation === 'CRITICAL: Cross-Dock') recColor = 'text-red-500 font-bold';
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-gray-700 hover:bg-gray-700';
+                        tr.innerHTML = `<td class="py-2 cursor-pointer">${item.ntc_used}</td><td class="py-2 cursor-pointer text-center">${item.pending_count}</td><td class="py-2">${item.departs_in_mins} mins</td><td class="py-2 ${recColor}">${item.recommendation}</td>`;
+                        tr.querySelector('td:nth-child(1)').onclick = () => applyFiltersAndRender([{key: 'ntc_used', value: item.ntc_used}]);
+                        tr.querySelector('td:nth-child(2)').onclick = () => applyFiltersAndRender([{key: 'ntc_used', value: item.ntc_used}, {key: 'put_status', value: 'Put Pending'}]);
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    wrapper.appendChild(table); return wrapper;
+                },
+                load_analysis: (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-cyan-400">Load Analysis</h3>`;
+                    if (data.load_alerts && data.load_alerts.length > 0) {
+                        const alertContainer = document.createElement('ul');
+                        alertContainer.className = 'mt-2 ml-4 space-y-1';
+                        data.load_alerts.forEach(alertText => { 
+                            const li = document.createElement('li');
+                            li.className = 'insight-alert text-yellow-300';
+                            let futureAlertText = alertText.replace('is using', 'will use an estimated');
+                            li.innerHTML = `⚠️ ${futureAlertText}`;
+                            alertContainer.appendChild(li); 
+                        });
+                        wrapper.appendChild(alertContainer);
+                    }
+                    if (data.adhoc_suggestions && data.adhoc_suggestions.length > 0) {
+                        const adhocContainer = document.createElement('div');
+                        adhocContainer.className = 'mt-2 space-y-1';
+                        data.adhoc_suggestions.forEach(suggestion => { const p = document.createElement('p'); p.className = 'text-sm p-2 rounded-md bg-red-900 text-white border border-red-700'; p.innerHTML = `🚨 ${suggestion}`; adhocContainer.appendChild(p); });
+                        wrapper.appendChild(adhocContainer);
+                    }
+                    if (data.utilization_table && data.utilization_table.length > 0) {
+                        const subhead = document.createElement('p');
+                        subhead.className = 'text-sm mt-4 mb-2 text-gray-300';
+                        subhead.textContent = 'Expected utilization for departures in next 3 hours:';
+                        wrapper.appendChild(subhead);
+                        const tableDiv = document.createElement('div');
+                        tableDiv.className = 'overflow-x-auto';
+                        let tableHTML = `<table class="utilization-table text-xs w-full">
+                            <thead><tr>
+                                <th class="text-left w-2/5 py-2">NTC</th>
+                                <th class="text-right py-2">Exp. Util<br>(PUT)</th>
+                                <th class="text-right py-2">Exp. Util<br>(NOT PUT)</th>
+                                <th class="text-right py-2">Total<br>In-Center</th>
+                                <th class="text-right py-2">Max Possible<br>Util</th>
+                            </tr></thead><tbody>`;
+                        data.utilization_table.forEach(row => {
+                            tableHTML += `<tr>
+                                <td class="text-left"><div class="font-semibold">${row.ntc}</div><div class="text-gray-400">${row.next_connection}</div><div class="text-gray-400 italic text-xs">${row.vehicle_size}</div></td>
+                                <td class="text-right"><div>${row.put_util_v.toFixed(1)}% (V)</div><div>${row.put_util_w.toFixed(1)}% (W)</div></td>
+                                <td class="text-right"><div>${row.not_put_util_v.toFixed(1)}% (V)</div><div>${row.not_put_util_w.toFixed(1)}% (W)</div></td>
+                                <td class="text-right"><div>${row.total_util_v.toFixed(1)}% (V)</div><div>${row.total_util_w.toFixed(1)}% (W)</div></td>
+                                <td class="text-right font-bold bg-gray-900"><div>${row.max_util_v.toFixed(1)}% (V)</div><div>${row.max_util_w.toFixed(1)}% (W)</div></td>
+                            </tr>`;
+                        });
+                        tableHTML += `</tbody></table>`;
+                        tableDiv.innerHTML = tableHTML;
+                        wrapper.appendChild(tableDiv);
+                    }
+                    return wrapper;
+                },
+                carting_at_docks: (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-teal-400">Carting at Docks Alert</h3>`;
+                    if(!data || data.length === 0) { wrapper.innerHTML += `<p class="text-sm mt-2 text-green-300">✅ No carting shipments found at docks.</p>`; return wrapper; }
+                    wrapper.innerHTML += `<p class="text-sm mt-2">Move these carting shipments from Docks to Floor:</p>`;
+                    const ul = document.createElement('ul');
+                    ul.className = 'text-sm list-disc list-inside mt-2 space-y-1';
+                    data.forEach(item => {
+                        const li = document.createElement('li');
+                        li.className = 'p-1 cursor-pointer hover:bg-gray-700 rounded-md';
+                        const filters = [{key: 'ntc_used', value: item.ntc_used}, {key: 'put_status', value: 'Docks'}];
+                        li.append(createClickableSpan(item.count, filters, 'text-teal-300'));
+                        li.innerHTML += ` shipments for NTC <span class="font-bold">${item.ntc_used}</span> (ETD: ${item.etd_str})`;
+                        li.onclick = () => applyFiltersAndRender(filters);
+                        ul.appendChild(li);
+                    });
+                    wrapper.appendChild(ul); return wrapper;
+                },
+                unknown_ntcs: (data) => {
+                    const wrapper = document.createElement('div');
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-red-500">Unclassified NTCs Detected</h3>
+                                        <p class="text-sm mt-2">The following NTCs are not in the mapping:</p>
+                                        <div class="mt-2 p-2 bg-gray-800 rounded-md text-xs font-mono">${data.join(', ')}</div>`;
+                    return wrapper;
+                }
+            };
+            insightOrder.forEach(key => {
+                const insightData = insights[key];
+                if (!insightData) return;
+                let shouldRender = true;
+                if((key === 'unknown_ntcs' || key === 'carting_at_docks' || key === 'imminent_departures') && insightData.length === 0) shouldRender = false;
+                if(key === 'load_analysis' && insightData.utilization_table.length === 0 && insightData.load_alerts.length === 0 && insightData.adhoc_suggestions.length === 0) shouldRender = false;
+                if(shouldRender) {
+                    const insightElement = renderFunctions[key](insightData);
+                    if (insightElement) { container.appendChild(insightElement); }
+                }
+            });
+        }
+
+        function createFilterRule() {
+            const ruleId = `rule-${Date.now()}`;
+            const ruleDiv = document.createElement('div');
+            ruleDiv.id = ruleId;
+            ruleDiv.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 items-center';
+            const fields = {'Bag ID': 'bag_id', 'NTC': 'ntc_used', 'Lane Type': 'lane_type', 'PUT Status': 'put_status', 'PUT Location': 'putaway_location', 'PDT': 'pdt', 'Priority': 'priority', 'Age (Hours)': 'age_hours', 'Bag Status': 'bag_status'};
+            let fieldOptions = Object.keys(fields).map(name => `<option value="${fields[name]}">${name}</option>`).join('');
+            const operators = {'Text': [{val:'is', lbl:'is'}, {val:'is not', lbl:'is not'}, {val:'contains', lbl:'contains'}], 'Numeric': [{val:'>', lbl:'>'}, {val:'<', lbl:'<'}, {val:'==', lbl:'='}, {val:'>=', lbl:'>='}, {val:'<=', lbl:'<='}]};
+            ruleDiv.innerHTML = `<select name="field" class="p-2 border rounded-md bg-white">${fieldOptions}</select>
+                <select name="operator" class="p-2 border rounded-md bg-white"></select>
+                <div name="value-container" class="col-span-1 md:col-span-1"></div>
+                <button class="bg-red-500 text-white px-2 py-1 rounded-md justify-self-end text-xs">Remove</button>`;
+            filterRulesContainer.appendChild(ruleDiv);
+            const fieldSelect = ruleDiv.querySelector('select[name="field"]'), opSelect = ruleDiv.querySelector('select[name="operator"]'), valContainer = ruleDiv.querySelector('div[name="value-container"]');
+            const updateOperatorsAndValue = () => {
+                const selectedField = fieldSelect.value;
+                const isNumeric = selectedField === 'age_hours';
+                opSelect.innerHTML = (isNumeric ? operators.Numeric : operators.Text).map(op => `<option value="${op.val}">${op.lbl}</option>`).join('');
+                if (!window.currentAnalysisData) return;
+                const uniqueValues = [...new Set(window.currentAnalysisData.detailed_data.map(item => item[selectedField]).filter(Boolean))];
+                if (!isNumeric && uniqueValues.length < 100 && uniqueValues.length > 0) { 
+                    valContainer.innerHTML = `<input name="value" list="list-${ruleId}" class="p-2 border rounded-md w-full" placeholder="Enter value...">
+                                              <datalist id="list-${ruleId}">${uniqueValues.map(v => `<option value="${v}"></option>`).join('')}</datalist>`;
+                } else {
+                    valContainer.innerHTML = `<input name="value" type="${isNumeric ? 'number' : 'text'}" class="p-2 border rounded-md w-full" placeholder="Enter value...">`;
+                }
+            };
+            fieldSelect.addEventListener('change', updateOperatorsAndValue);
+            ruleDiv.querySelector('button').addEventListener('click', () => ruleDiv.remove());
+            updateOperatorsAndValue();
+        }
+
+        function applyMagicFilter() {
+            const logic = document.getElementById('filter-logic-selector').value;
+            const rules = [];
+            filterRulesContainer.querySelectorAll('.grid').forEach(ruleDiv => {
+                const field = ruleDiv.querySelector('select[name="field"]').value, operator = ruleDiv.querySelector('select[name="operator"]').value, value = ruleDiv.querySelector('input[name="value"]').value;
+                if (value) { rules.push({ field, operator, value }); }
+            });
+            let filteredData = window.currentAnalysisData.detailed_data;
+            if (rules.length > 0) {
+                 filteredData = filteredData.filter(row => {
+                    const checkRule = (rule) => {
+                        const rowValue = row[rule.field];
+                        if(rowValue === null || rowValue === undefined) return false;
+                        let value = rule.field === 'age_hours' ? parseFloat(rule.value) : rule.value;
+                        switch (rule.operator) {
+                            case 'is': return rowValue == value; case 'is not': return rowValue != value;
+                            case 'contains': return String(rowValue).toLowerCase().includes(String(value).toLowerCase());
+                            case '>': return rowValue > value; case '<': return rowValue < value;
+                            case '==': return rowValue == value; case '>=': return rowValue >= value;
+                            case '<=': return rowValue <= value; default: return false;
+                        }
+                    };
+                    if (logic === 'AND') return rules.every(checkRule);
+                    else return rules.some(checkRule);
+                 });
+            }
+
+            let shipmentCount = 0;
+            let bagCount = 0;
+            filteredData.forEach(row => {
+                if (row.bag_id && /^\d+$/.test(row.bag_id)) {
+                    shipmentCount++;
+                } else {
+                    bagCount++;
+                }
+            });
+            const countText = `(${shipmentCount} Shipments | ${bagCount} Bags)`;
+            const titleText = rules.length > 0 ? `${rules.length} Magic Filter(s) Applied` : 'All In-Center Shipments';
+            dynamicViewTitle.textContent = `Detailed View: ${titleText} ${countText}`;
+            
+            renderDetailedTable(filteredData);
+        }
+    }
+    document.addEventListener('DOMContentLoaded', initializeApp);
+    </script>
+</body>
+</html>
+
