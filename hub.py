@@ -1,5 +1,6 @@
 # hub_app.py - Final Version 4.9.4
-# This version corrects the volume unit conversion from cubic feet to cubic centimeters.
+# This version corrects the volume unit conversion from cubic feet to cubic centimeters
+# and includes a performance fix for date parsing to prevent worker timeouts.
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -19,7 +20,7 @@ CORS(app)
 
 # --- Global variables & Constants ---
 APP_START_TIME = datetime.now()
-BACKEND_VERSION = "4.9.4_UNIT_CONVERSION_FINAL" 
+BACKEND_VERSION = "4.9.5_PERFORMANCE_FIX" 
 TOTAL_ANALYSES_PERFORMED = 0
 LAST_ANALYSIS_TIME = "Never"
 
@@ -84,13 +85,29 @@ def classify_putaway_location(location):
     return 'Other'
 
 def parse_incoming_time(time_str, reference_date):
-    if pd.isna(time_str): return pd.NaT
+    if pd.isna(time_str):
+        return pd.NaT
+
     time_str = str(time_str).strip()
-    is_full_datetime = ('-' in time_str or '/' in time_str) and ':' in time_str
+
+    # *** PERFORMANCE FIX ***
+    # Use the exact date format to prevent timeouts.
+    # This format matches the value: "2025-07-10T19:00:00"
+    DATE_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
+    # Check if the string looks like a full datetime
+    is_full_datetime = ('-' in time_str and 'T' in time_str and ':' in time_str)
+
     if is_full_datetime:
-        try: return pd.to_datetime(time_str)
-        except (ValueError, TypeError): return pd.NaT
+        try:
+            # Explicitly provide the format for a massive speed improvement.
+            # 'coerce' will turn any parsing errors into NaT (Not a Time)
+            return pd.to_datetime(time_str, format=DATE_FORMAT, errors='coerce')
+        except (ValueError, TypeError):
+            # Fallback for any unexpected errors
+            return pd.NaT
     else:
+        # This part handles other potential time-only formats
         try:
             time_parts = re.split(r'[:]', time_str)
             if '.' in time_parts[-1]:
@@ -103,9 +120,11 @@ def parse_incoming_time(time_str, reference_date):
             hours %= 24
             base_date = reference_date.date()
             incoming_dt = datetime.combine(base_date, datetime.min.time()).replace(hour=hours, minute=minutes, second=seconds, microsecond=microseconds) + day_offset
-            if incoming_dt > reference_date: incoming_dt -= timedelta(days=1)
+            if incoming_dt > reference_date:
+                incoming_dt -= timedelta(days=1)
             return incoming_dt
-        except (ValueError, IndexError): return pd.NaT
+        except (ValueError, IndexError):
+            return pd.NaT
 
 def format_age_string(delta):
     if pd.isna(delta) or delta.total_seconds() < 0: return "Invalid"
@@ -223,7 +242,11 @@ def get_load_analysis(df, current_time):
                 if wt_util > 20 or vol_util > 20: load_alerts.append(f"A lot of {len(group)} shipments for '{client}' to {ntc} will utilise {wt_util:.0f}% of wt & {vol_util:.0f}% of available Vol of a {group['vehicle_size'].iloc[0]}.")
     return {'utilization_table': utilization_table, 'load_alerts': list(set(load_alerts)), 'adhoc_suggestions': adhoc_suggestions}
 
-# --- Main API Endpoint ---
+# --- Main API Endpoints ---
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({"status": "healthy", "message": "Hub analytics service is running."}), 200
+
 @app.route('/api/hub-analytics', methods=['POST'])
 def hub_analytics_api():
     global TOTAL_ANALYSES_PERFORMED, LAST_ANALYSIS_TIME
