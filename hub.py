@@ -1,5 +1,5 @@
-# hub_app.py - Final Version 4.9.6
-# This version includes fixes for worker timeouts and pandas merge errors.
+# hub_app.py - Final Version 4.9.7
+# This version includes fixes for NaN in JSON responses and pandas FutureWarnings.
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -15,11 +15,13 @@ import math
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
+# Fix: Automatically convert NaN to null in JSON responses
+app.config['JSON_NAN_AS_NULL'] = True
 CORS(app)
 
 # --- Global variables & Constants ---
 APP_START_TIME = datetime.now()
-BACKEND_VERSION = "4.9.6_MERGE_FIX" 
+BACKEND_VERSION = "4.9.7_JSON_FIX"
 TOTAL_ANALYSES_PERFORMED = 0
 LAST_ANALYSIS_TIME = "Never"
 
@@ -241,7 +243,8 @@ def get_load_analysis(df, current_time):
             max_wt_util, max_vol_util = (max_possible_wt/wt_cap*100) if wt_cap > 0 else 0, (max_possible_vol/vol_cap*100) if vol_cap > 0 else 0
             if max_wt_util >= 150 or max_vol_util >= 150: adhoc_suggestions.append(f"NTC {ntc} has max potential utilization of {max(max_wt_util, max_vol_util):.0f}%. An ad-hoc vehicle may be required.")
     
-    df['time_bucket'] = df['incoming_time_dt'].dt.floor('4H')
+    # Fix: Changed '4H' to '4h' to address FutureWaring
+    df['time_bucket'] = df['incoming_time_dt'].dt.floor('4h')
     for _, row in df.iterrows():
         if row['vehicle_wt_capacity'] == 0: continue
         wt_util = (row['bag_wt'] / row['vehicle_wt_capacity'] * 100)
