@@ -1,4 +1,4 @@
-# hub_app.py - Final Version with Unrestricted CORS
+# hub_app.py - Final Version with Optimized Date Parsing
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -14,16 +14,15 @@ import math
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__)
-# MODIFIED: Allow all origins to access API routes
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # --- Global variables & Constants ---
 APP_START_TIME = datetime.now()
-BACKEND_VERSION = "4.9.5_CORS_UNRESTRICTED" 
+BACKEND_VERSION = "4.9.6_OPTIMIZED" 
 TOTAL_ANALYSES_PERFORMED = 0
 LAST_ANALYSIS_TIME = "Never"
 
-# --- Definitive Mappings ---
+# --- Mappings (No changes needed) ---
 LANE_MAP = {
     'Coimbatore_Pudhupalayam_GW': 'FTL', 'Mangalore_Katipalla_H': 'FTL', 'Hassan_Nagathavalli_I': 'FTL',
     'Gurgaon_Tauru_GW': 'FTL', 'Davangere_Industrialarea_I': 'FTL', 'Pune_Sudhwadi_GW': 'FTL',
@@ -83,29 +82,7 @@ def classify_putaway_location(location):
     if re.match(r'Z\d+\.R\d+\.B\d+', location): return 'Standard Floor'
     return 'Other'
 
-def parse_incoming_time(time_str, reference_date):
-    if pd.isna(time_str): return pd.NaT
-    time_str = str(time_str).strip()
-    is_full_datetime = ('-' in time_str or '/' in time_str) and ':' in time_str
-    if is_full_datetime:
-        try: return pd.to_datetime(time_str)
-        except (ValueError, TypeError): return pd.NaT
-    else:
-        try:
-            time_parts = re.split(r'[:]', time_str)
-            if '.' in time_parts[-1]:
-                seconds_parts = time_parts[-1].split('.')
-                seconds, microseconds = int(seconds_parts[0]), int(seconds_parts[1][:6].ljust(6, '0'))
-            else:
-                seconds, microseconds = (int(time_parts[-1]) if len(time_parts) > 2 else 0), 0
-            minutes, hours = int(time_parts[1]), int(time_parts[0])
-            day_offset = timedelta(days=hours // 24)
-            hours %= 24
-            base_date = reference_date.date()
-            incoming_dt = datetime.combine(base_date, datetime.min.time()).replace(hour=hours, minute=minutes, second=seconds, microsecond=microseconds) + day_offset
-            if incoming_dt > reference_date: incoming_dt -= timedelta(days=1)
-            return incoming_dt
-        except (ValueError, IndexError): return pd.NaT
+# The old parse_incoming_time function is no longer needed and can be removed.
 
 def format_age_string(delta):
     if pd.isna(delta) or delta.total_seconds() < 0: return "Invalid"
@@ -120,7 +97,8 @@ def format_etd_string(etd, current_time):
     total_hours = days * 24 + int(hours)
     return f"Next connection in {total_hours} hours {int(minutes)} mins"
 
-# --- Insight Generation Functions ---
+# Insight Generation Functions (No changes needed)
+# ... (all the get_*_insight functions remain the same) ...
 def get_ntc_breakdown(lane_type_df, current_time):
     if lane_type_df.empty: return []
     ntc_summary = lane_type_df.groupby('ntc_used').agg(total_wbns=('bag_id', 'count'), next_etd=('etd', 'min')).reset_index()
@@ -135,7 +113,6 @@ def get_ntc_breakdown(lane_type_df, current_time):
     for col in ntc_summary.columns:
         if 'hrs' in str(col) or col in ['total_wbns', 'bags_in_docks']: ntc_summary[col] = ntc_summary[col].astype(int)
     return ntc_summary.sort_values(by='total_wbns', ascending=False).to_dict(orient='records')
-    
 def get_put_predictor_insights(df, current_put_compliance):
     put_pending_df = df[df['put_status'] == 'Put Pending']
     total_put_pending = len(put_pending_df)
@@ -154,7 +131,6 @@ def get_put_predictor_insights(df, current_put_compliance):
         needed_puts_to_reach_target = math.ceil((target_put_percent / 100 * len(old_shipments)) - len(old_put_shipments))
         if needed_puts_to_reach_target > 0: target_rate = {'needed': True, 'rate': needed_puts_to_reach_target}
     return {'total_pending': total_put_pending, 'at_risk_15m': calculate_projection(15), 'at_risk_30m': calculate_projection(30), 'critical_4h_plus': {'count': critical_count}, 'target_rate': target_rate}
-
 def get_imminent_departures_insight(df, current_time):
     two_hours_from_now = current_time + timedelta(hours=2)
     imminent_departures_df = df[(df['etd'] > current_time) & (df['etd'] <= two_hours_from_now) & (df['put_status'] == 'Put Pending')].copy()
@@ -168,7 +144,6 @@ def get_imminent_departures_insight(df, current_time):
         if row['pending_count'] > 10 and minutes_to_departure < 45: recommendation = "CRITICAL: Cross-Dock"
         results.append({'ntc_used': row['ntc_used'], 'pending_count': row['pending_count'], 'departs_in_mins': int(minutes_to_departure), 'recommendation': recommendation})
     return results
-
 def get_carting_at_docks_insight(df, current_time):
     nine_hours_from_now = current_time + timedelta(hours=9)
     actionable_df = df[(df['lane_type'] == 'CARTING') & (df['put_status'] == 'Docks') & (df['etd'] > current_time) & (df['etd'] <= nine_hours_from_now)].copy()
@@ -176,7 +151,6 @@ def get_carting_at_docks_insight(df, current_time):
     summary = actionable_df.groupby('ntc_used').agg(count=('bag_id', 'count'), etd=('etd', 'min')).reset_index()
     summary['etd_str'] = summary['etd'].dt.strftime('%H:%M')
     return summary.sort_values(by='etd').to_dict(orient='records')
-
 def get_load_analysis(df, current_time):
     if df.empty or 'vehicle_wt_capacity' not in df.columns: return {'utilization_table': [], 'load_alerts': [], 'adhoc_suggestions': []}
     three_hours_from_now = current_time + timedelta(hours=3)
@@ -262,13 +236,48 @@ def hub_analytics_api():
             if col not in df.columns: df[col] = 0
         
         df['bag_id'] = df['bag_id'].apply(clean_bag_id)
-        df['incoming_time_dt'] = df['incoming_time'].apply(lambda x: parse_incoming_time(x, current_time))
+        
+        # --- OPTIMIZED DATE PARSING ---
+        # Attempt to parse standard formats first, which is very fast
+        df['incoming_time_dt'] = pd.to_datetime(df['incoming_time'], errors='coerce')
+        
+        # For rows that failed (NaT), apply the slower, custom time-only format parsing
+        failed_mask = df['incoming_time_dt'].isna()
+        if failed_mask.any():
+            # Create a base date from the current_time for combining with time-only strings
+            base_date = current_time.date()
+            
+            # This function will only be called for the few rows that need it
+            def parse_time_only(time_str):
+                try:
+                    time_parts = re.split(r'[:]', str(time_str).strip())
+                    if '.' in time_parts[-1]:
+                        seconds_parts = time_parts[-1].split('.')
+                        seconds, microseconds = int(seconds_parts[0]), int(seconds_parts[1][:6].ljust(6, '0'))
+                    else:
+                        seconds, microseconds = (int(time_parts[-1]) if len(time_parts) > 2 else 0), 0
+                    minutes, hours = int(time_parts[1]), int(time_parts[0])
+                    
+                    day_offset = timedelta(days=hours // 24)
+                    hours %= 24
+                    
+                    dt_obj = datetime.combine(base_date, datetime.min.time()).replace(
+                        hour=hours, minute=minutes, second=seconds, microsecond=microseconds
+                    ) + day_offset
+                    
+                    # If the parsed time is in the future, assume it's from the previous day
+                    if dt_obj > current_time:
+                        dt_obj -= timedelta(days=1)
+                    return dt_obj
+                except (ValueError, IndexError):
+                    return pd.NaT
+
+            df.loc[failed_mask, 'incoming_time_dt'] = df.loc[failed_mask, 'incoming_time'].apply(parse_time_only)
+
         df['etd'] = pd.to_datetime(df['etd'], errors='coerce')
         for col in ['package_count', 'bag_wt', 'bag_vol']: 
             if col in df.columns: df[col] = pd.to_numeric(df[col], errors='coerce').fillna(1 if col == 'package_count' else 0)
         
-        # *** CORRECTED UNIT CONVERSION FIX ***
-        # Convert bag volume from cubic feet (ft^3) to cubic centimeters (cm^3)
         if 'bag_vol' in df.columns:
             df['bag_vol'] = df['bag_vol'] * 28316.8
 
