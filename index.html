@@ -45,22 +45,15 @@
         .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.875rem; vertical-align: top; }
         .insight-alert { @apply text-sm list-item; }
         
-        #loadingOverlay {
-            transition: opacity 0.3s ease-in-out;
-        }
-        .progress-bar-container {
-            width: 80%; max-width: 600px; background-color: #374151; border-radius: 0.5rem; overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-        }
-        .progress-bar {
-            height: 1.5rem;
-            background: linear-gradient(90deg, #3b82f6, #10b981);
-            width: 0%;
-        }
-        @keyframes loading-animation {
-            0% { width: 0%; }
-            100% { width: 100%; }
-        }
+        #loadingOverlay { transition: opacity 0.3s ease-in-out; }
+        .progress-bar-container { width: 80%; max-width: 600px; background-color: #374151; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .progress-bar { height: 1.5rem; background: linear-gradient(90deg, #3b82f6, #10b981); width: 0%; }
+        @keyframes loading-animation { 0% { width: 0%; } 100% { width: 100%; } }
+
+        /* New Server Status Styles */
+        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
+        .status-dot.bg-green-500, .status-dot.bg-yellow-500 { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
@@ -74,8 +67,7 @@
     <div id="copyModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center">
         <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
             <h3 class="text-xl font-bold mb-4">Select Data to Copy</h3>
-            <div id="copy-columns-container" class="grid grid-cols-2 gap-2 mb-6">
-            </div>
+            <div id="copy-columns-container" class="grid grid-cols-2 gap-2 mb-6"></div>
             <div class="flex justify-end space-x-4">
                 <button id="closeCopyModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Cancel</button>
                 <button id="confirmCopyBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Copy Selected</button>
@@ -88,6 +80,21 @@
             <h1 class="text-4xl font-bold">Hub In-Center Analytics</h1>
             <p id="fileTimestamp" class="text-blue-200 text-lg">Instant Analytics for Peak Hub Performance</p>
         </div>
+
+        <div class="card mb-6 bg-gray-50 border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div id="serverStatus" class="flex items-center space-x-2 text-sm">
+                    <span class="status-dot bg-yellow-500"></span>
+                    <span class="font-semibold text-gray-700">Server Status:</span>
+                    <span class="text-gray-600">Checking...</span>
+                </div>
+                <div class="text-xs text-gray-500 text-right">
+                    <p><strong>Note:</strong> This is a beta deployment hosted on a personal server with limited bandwidth.</p>
+                    <p>The server may go offline after periods of inactivity. Please refresh the page if there is any error.</p>
+                </div>
+            </div>
+        </div>
+
         <div id="uploadSection" class="card mb-6">
              <div class="flex items-center space-x-4">
                 <input type="file" id="fileUpload" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg cursor-pointer">
@@ -181,6 +188,7 @@
         const addRuleBtn = document.getElementById('add-rule-btn'), filterRulesContainer = document.getElementById('filter-rules-container'), applyMagicFilterBtn = document.getElementById('apply-magic-filter-btn');
         const loadingOverlay = document.getElementById('loadingOverlay'), loadingMessage = document.getElementById('loadingMessage'), progressBar = document.getElementById('progressBar');
         const welcomeSection = document.getElementById('welcomeSection');
+        const serverStatusDiv = document.getElementById('serverStatus');
         
         const copyDataBtn = document.getElementById('copyDataBtn');
         const copyModal = document.getElementById('copyModal');
@@ -190,6 +198,31 @@
 
         let currentSortKey = 'age_hours', isSortAscending = false, messageInterval;
         let currentlyRenderedData = [];
+
+        // IMPORTANT: Replace this with the URL of your deployed Hub Analytics backend
+        const API_BASE_URL = 'https://your-hub-analytics-api.onrender.com';
+
+        // --- Server Status Check ---
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/hub-status`);
+                if (response.ok) {
+                    const data = await response.json();
+                    serverStatusDiv.innerHTML = `
+                        <span class="status-dot bg-green-500"></span>
+                        <span class="font-semibold text-gray-700">Server Status:</span>
+                        <span class="text-green-700 font-bold">Online</span>
+                        <span class="text-gray-500 text-xs">(v${data.version})</span>`;
+                } else {
+                    throw new Error('Server responded with an error');
+                }
+            } catch (error) {
+                serverStatusDiv.innerHTML = `
+                    <span class="status-dot bg-red-500"></span>
+                    <span class="font-semibold text-gray-700">Server Status:</span>
+                    <span class="text-red-700 font-bold">Offline</span>`;
+            }
+        }
 
         analyzeButton.addEventListener('click', handleAnalysis);
         addRuleBtn.addEventListener('click', () => createFilterRule());
@@ -272,8 +305,7 @@
                 reader.onload = async (e) => {
                     try {
                         const fileDate = new Date(file.lastModified);
-                        // IMPORTANT: Replace this with your deployed backend URL
-                        const response = await fetch('http://127.0.0.1:5002/api/hub-analytics', {
+                        const response = await fetch(`${API_BASE_URL}/api/hub-analytics`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ csv_content: e.target.result, file_timestamp: fileDate.toISOString() })
@@ -401,47 +433,32 @@
             const tableBody = document.createElement('tbody');
             ntcData.forEach(row => {
                 const tr = document.createElement('tr');
-
                 const ntcCell = document.createElement('td');
                 ntcCell.className = 'clickable-cell font-semibold';
                 ntcCell.innerHTML = `${row.ntc_used}<div class="text-xs text-gray-500 font-normal italic">${row.etd_string || ''}</div>`;
                 ntcCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
                 tr.appendChild(ntcCell);
-
                 const totalCell = document.createElement('td');
                 totalCell.className = 'clickable-cell text-center';
                 totalCell.textContent = row.total_wbns;
                 totalCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
                 tr.appendChild(totalCell);
-
                 const lessThan24Cell = document.createElement('td');
                 lessThan24Cell.className = 'clickable-cell text-center';
                 lessThan24Cell.textContent = row['<24 hrs'] || 0;
-                lessThan24Cell.onclick = () => applyFiltersAndRender([
-                    { key: "ntc_used", value: row.ntc_used },
-                    { key: "age_hours", op: '<', value: 24, label: 'age' }
-                ]);
+                lessThan24Cell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "age_hours", op: '<', value: 24, label: 'age' }]);
                 tr.appendChild(lessThan24Cell);
-                
                 const over24Value = (row['24-48 hrs'] || 0) + (row['48-72 hrs'] || 0) + (row['72+ hrs'] || 0);
                 const over24Cell = document.createElement('td');
                 over24Cell.className = 'clickable-cell text-center';
                 over24Cell.textContent = over24Value;
-                over24Cell.onclick = () => applyFiltersAndRender([
-                    { key: "ntc_used", value: row.ntc_used },
-                    { key: "age_hours", op: '>=', value: 24, label: 'age' }
-                ]);
+                over24Cell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "age_hours", op: '>=', value: 24, label: 'age' }]);
                 tr.appendChild(over24Cell);
-
                 const docksCell = document.createElement('td');
                 docksCell.className = 'clickable-cell text-center font-bold';
                 docksCell.textContent = row.bags_in_docks || 0;
-                docksCell.onclick = () => applyFiltersAndRender([
-                    { key: "ntc_used", value: row.ntc_used }, 
-                    { key: "put_status", value: "Docks" }
-                ]);
+                docksCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "put_status", value: "Docks" }]);
                 tr.appendChild(docksCell);
-                
                 tableBody.appendChild(tr);
             });
             
@@ -491,8 +508,7 @@
                         case 'BAG ID':
                             const id = row.bag_id; const isShipment = /^\d+$/.test(id);
                             const url = isShipment ? `https://hq.delhivery.com/p/pntrzz/${id}/` : `https://hq.delhivery.com/bag/${id}/`;
-                            cellContent = `<div><a href="${url}" target="_blank" class="text-blue-600 hover:underline font-semibold">${id}</a></div>
-                                         <div class="text-xs text-gray-600">(${row.pdt} | ${row.priority})</div>`;
+                            cellContent = `<div><a href="${url}" target="_blank" class="text-blue-600 hover:underline font-semibold">${id}</a></div><div class="text-xs text-gray-600">(${row.pdt} | ${row.priority})</div>`;
                             break;
                         case 'NTC': cellContent = row.ntc_used; break;
                         case 'AGE': cellContent = row.age_str; break;
@@ -520,26 +536,15 @@
         }
         
         const copyableColumns = {
-            'bag_id': 'Bag/Shipment ID',
-            'ntc_used': 'NTC',
-            'age_str': 'Age',
-            'put_status': 'PUT Status',
-            'putaway_location': 'PUT Location',
-            'pdt': 'Product Type',
-            'priority': 'Priority',
-            'incoming_time_dt': 'Incoming Time'
+            'bag_id': 'Bag/Shipment ID', 'ntc_used': 'NTC', 'age_str': 'Age', 'put_status': 'PUT Status',
+            'putaway_location': 'PUT Location', 'pdt': 'Product Type', 'priority': 'Priority', 'incoming_time_dt': 'Incoming Time'
         };
 
         function openCopyModal() {
             copyColumnsContainer.innerHTML = '';
             Object.entries(copyableColumns).forEach(([key, label]) => {
                 const isChecked = ['bag_id', 'ntc_used', 'age_str', 'put_status'].includes(key);
-                const checkboxHtml = `
-                    <label class="flex items-center space-x-2 cursor-pointer">
-                        <input type="checkbox" value="${key}" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${isChecked ? 'checked' : ''}>
-                        <span class="text-gray-700">${label}</span>
-                    </label>
-                `;
+                const checkboxHtml = `<label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" value="${key}" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${isChecked ? 'checked' : ''}><span class="text-gray-700">${label}</span></label>`;
                 copyColumnsContainer.insertAdjacentHTML('beforeend', checkboxHtml);
             });
             copyModal.classList.remove('hidden');
@@ -547,41 +552,28 @@
 
         function copySelectedData() {
             const selectedColumns = Array.from(copyColumnsContainer.querySelectorAll('input:checked')).map(cb => cb.value);
-            if (selectedColumns.length === 0) {
-                alert("Please select at least one column to copy.");
-                return;
-            }
-
+            if (selectedColumns.length === 0) { alert("Please select at least one column to copy."); return; }
             const headerText = dynamicViewTitle.textContent;
-            
             let textToCopy = `${headerText}\n\n`;
-            
             textToCopy += selectedColumns.map(key => copyableColumns[key]).join('\t') + '\n';
-            
             currentlyRenderedData.forEach(row => {
                 const rowData = selectedColumns.map(key => {
                     let value = row[key] || 'N/A';
-                    if (key === 'incoming_time_dt') {
-                        value = value ? new Date(value).toLocaleString() : 'N/A';
-                    }
+                    if (key === 'incoming_time_dt') { value = value ? new Date(value).toLocaleString() : 'N/A'; }
                     return value;
                 });
                 textToCopy += rowData.join('\t') + '\n';
             });
-
             copyTextToClipboard(textToCopy);
             copyModal.classList.add('hidden');
         }
 
         function copyTextToClipboard(text) {
             const textArea = document.createElement("textarea");
-            textArea.style.position = 'fixed';
-            textArea.style.top = '-9999px';
-            textArea.style.left = '-9999px';
+            textArea.style.position = 'fixed'; textArea.style.top = '-9999px'; textArea.style.left = '-9999px';
             textArea.value = text;
             document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
+            textArea.focus(); textArea.select();
             try {
                 document.execCommand('copy');
                 showMessage('Copied to clipboard!', false, 3000);
@@ -595,7 +587,6 @@
             const container = document.getElementById('insights-container');
             container.innerHTML = ''; 
             const insightOrder = ['put_predictor', 'imminent_departures', 'load_analysis', 'carting_at_docks', 'unknown_ntcs'];
-            
             const createClickableSpan = (text, filters, colorClass) => {
                 const span = document.createElement('span');
                 span.className = `font-bold underline cursor-pointer ${colorClass}`;
@@ -603,7 +594,6 @@
                 span.onclick = () => applyFiltersAndRender(filters);
                 return span;
             };
-
             const renderFunctions = {
                 put_predictor: (data) => {
                     const wrapper = document.createElement('div');
@@ -683,23 +673,8 @@
                         wrapper.appendChild(subhead);
                         const tableDiv = document.createElement('div');
                         tableDiv.className = 'overflow-x-auto';
-                        let tableHTML = `<table class="utilization-table text-xs w-full">
-                            <thead><tr>
-                                <th class="text-left w-2/5 py-2">NTC</th>
-                                <th class="text-right py-2">Exp. Util<br>(PUT)</th>
-                                <th class="text-right py-2">Exp. Util<br>(NOT PUT)</th>
-                                <th class="text-right py-2">Total<br>In-Center</th>
-                                <th class="text-right py-2">Max Possible<br>Util</th>
-                            </tr></thead><tbody>`;
-                        data.utilization_table.forEach(row => {
-                            tableHTML += `<tr>
-                                <td class="text-left"><div class="font-semibold">${row.ntc}</div><div class="text-gray-400">${row.next_connection}</div><div class="text-gray-400 italic text-xs">${row.vehicle_size}</div></td>
-                                <td class="text-right"><div>${row.put_util_v.toFixed(1)}% (V)</div><div>${row.put_util_w.toFixed(1)}% (W)</div></td>
-                                <td class="text-right"><div>${row.not_put_util_v.toFixed(1)}% (V)</div><div>${row.not_put_util_w.toFixed(1)}% (W)</div></td>
-                                <td class="text-right"><div>${row.total_util_v.toFixed(1)}% (V)</div><div>${row.total_util_w.toFixed(1)}% (W)</div></td>
-                                <td class="text-right font-bold bg-gray-900"><div>${row.max_util_v.toFixed(1)}% (V)</div><div>${row.max_util_w.toFixed(1)}% (W)</div></td>
-                            </tr>`;
-                        });
+                        let tableHTML = `<table class="utilization-table text-xs w-full"><thead><tr><th class="text-left w-2/5 py-2">NTC</th><th class="text-right py-2">Exp. Util<br>(PUT)</th><th class="text-right py-2">Exp. Util<br>(NOT PUT)</th><th class="text-right py-2">Total<br>In-Center</th><th class="text-right py-2">Max Possible<br>Util</th></tr></thead><tbody>`;
+                        data.utilization_table.forEach(row => { tableHTML += `<tr><td class="text-left"><div class="font-semibold">${row.ntc}</div><div class="text-gray-400">${row.next_connection}</div><div class="text-gray-400 italic text-xs">${row.vehicle_size}</div></td><td class="text-right"><div>${row.put_util_v.toFixed(1)}% (V)</div><div>${row.put_util_w.toFixed(1)}% (W)</div></td><td class="text-right"><div>${row.not_put_util_v.toFixed(1)}% (V)</div><div>${row.not_put_util_w.toFixed(1)}% (W)</div></td><td class="text-right"><div>${row.total_util_v.toFixed(1)}% (V)</div><div>${row.total_util_w.toFixed(1)}% (W)</div></td><td class="text-right font-bold bg-gray-900"><div>${row.max_util_v.toFixed(1)}% (V)</div><div>${row.max_util_w.toFixed(1)}% (W)</div></td></tr>`; });
                         tableHTML += `</tbody></table>`;
                         tableDiv.innerHTML = tableHTML;
                         wrapper.appendChild(tableDiv);
@@ -726,9 +701,7 @@
                 },
                 unknown_ntcs: (data) => {
                     const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-red-500">Unclassified NTCs Detected</h3>
-                                        <p class="text-sm mt-2">The following NTCs are not in the mapping:</p>
-                                        <div class="mt-2 p-2 bg-gray-800 rounded-md text-xs font-mono">${data.join(', ')}</div>`;
+                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-red-500">Unclassified NTCs Detected</h3><p class="text-sm mt-2">The following NTCs are not in the mapping:</p><div class="mt-2 p-2 bg-gray-800 rounded-md text-xs font-mono">${data.join(', ')}</div>`;
                     return wrapper;
                 }
             };
@@ -753,10 +726,7 @@
             const fields = {'Bag ID': 'bag_id', 'NTC': 'ntc_used', 'Lane Type': 'lane_type', 'PUT Status': 'put_status', 'PUT Location': 'putaway_location', 'PDT': 'pdt', 'Priority': 'priority', 'Age (Hours)': 'age_hours', 'Bag Status': 'bag_status'};
             let fieldOptions = Object.keys(fields).map(name => `<option value="${fields[name]}">${name}</option>`).join('');
             const operators = {'Text': [{val:'is', lbl:'is'}, {val:'is not', lbl:'is not'}, {val:'contains', lbl:'contains'}], 'Numeric': [{val:'>', lbl:'>'}, {val:'<', lbl:'<'}, {val:'==', lbl:'='}, {val:'>=', lbl:'>='}, {val:'<=', lbl:'<='}]};
-            ruleDiv.innerHTML = `<select name="field" class="p-2 border rounded-md bg-white">${fieldOptions}</select>
-                <select name="operator" class="p-2 border rounded-md bg-white"></select>
-                <div name="value-container" class="col-span-1 md:col-span-1"></div>
-                <button class="bg-red-500 text-white px-2 py-1 rounded-md justify-self-end text-xs">Remove</button>`;
+            ruleDiv.innerHTML = `<select name="field" class="p-2 border rounded-md bg-white">${fieldOptions}</select><select name="operator" class="p-2 border rounded-md bg-white"></select><div name="value-container" class="col-span-1 md:col-span-1"></div><button class="bg-red-500 text-white px-2 py-1 rounded-md justify-self-end text-xs">Remove</button>`;
             filterRulesContainer.appendChild(ruleDiv);
             const fieldSelect = ruleDiv.querySelector('select[name="field"]'), opSelect = ruleDiv.querySelector('select[name="operator"]'), valContainer = ruleDiv.querySelector('div[name="value-container"]');
             const updateOperatorsAndValue = () => {
@@ -766,8 +736,7 @@
                 if (!window.currentAnalysisData) return;
                 const uniqueValues = [...new Set(window.currentAnalysisData.detailed_data.map(item => item[selectedField]).filter(Boolean))];
                 if (!isNumeric && uniqueValues.length < 100 && uniqueValues.length > 0) { 
-                    valContainer.innerHTML = `<input name="value" list="list-${ruleId}" class="p-2 border rounded-md w-full" placeholder="Enter value...">
-                                              <datalist id="list-${ruleId}">${uniqueValues.map(v => `<option value="${v}"></option>`).join('')}</datalist>`;
+                    valContainer.innerHTML = `<input name="value" list="list-${ruleId}" class="p-2 border rounded-md w-full" placeholder="Enter value..."><datalist id="list-${ruleId}">${uniqueValues.map(v => `<option value="${v}"></option>`).join('')}</datalist>`;
                 } else {
                     valContainer.innerHTML = `<input name="value" type="${isNumeric ? 'number' : 'text'}" class="p-2 border rounded-md w-full" placeholder="Enter value...">`;
                 }
@@ -803,22 +772,18 @@
                     else return rules.some(checkRule);
                  });
             }
-
-            let shipmentCount = 0;
-            let bagCount = 0;
+            let shipmentCount = 0, bagCount = 0;
             filteredData.forEach(row => {
-                if (row.bag_id && /^\d+$/.test(row.bag_id)) {
-                    shipmentCount++;
-                } else {
-                    bagCount++;
-                }
+                if (row.bag_id && /^\d+$/.test(row.bag_id)) { shipmentCount++; } else { bagCount++; }
             });
             const countText = `(${shipmentCount} Shipments | ${bagCount} Bags)`;
             const titleText = rules.length > 0 ? `${rules.length} Magic Filter(s) Applied` : 'All In-Center Shipments';
             dynamicViewTitle.textContent = `Detailed View: ${titleText} ${countText}`;
-            
             renderDetailedTable(filteredData);
         }
+        
+        // Initial call
+        checkServerStatus();
     }
     document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
