@@ -1,6 +1,5 @@
-# hub_app.py - Final Version 4.9.4
-# This version corrects the volume unit conversion from cubic feet to cubic centimeters
-# and includes a performance fix for date parsing to prevent worker timeouts.
+# hub_app.py - Final Version 4.9.6
+# This version includes fixes for worker timeouts and pandas merge errors.
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -20,7 +19,7 @@ CORS(app)
 
 # --- Global variables & Constants ---
 APP_START_TIME = datetime.now()
-BACKEND_VERSION = "4.9.5_PERFORMANCE_FIX" 
+BACKEND_VERSION = "4.9.6_MERGE_FIX" 
 TOTAL_ANALYSES_PERFORMED = 0
 LAST_ANALYSIS_TIME = "Never"
 
@@ -141,18 +140,37 @@ def format_etd_string(etd, current_time):
 
 # --- Insight Generation Functions ---
 def get_ntc_breakdown(lane_type_df, current_time):
-    if lane_type_df.empty: return []
-    ntc_summary = lane_type_df.groupby('ntc_used').agg(total_wbns=('bag_id', 'count'), next_etd=('etd', 'min')).reset_index()
-    age_breakdown_per_ntc = lane_type_df.groupby(['ntc_used', 'ageing_breakdown']).size().unstack(fill_value=0)
+    if lane_type_df.empty:
+        return []
+
+    ntc_summary = lane_type_df.groupby('ntc_used').agg(
+        total_wbns=('bag_id', 'count'),
+        next_etd=('etd', 'min')
+    ).reset_index()
+
+    # Create the age breakdown summary
+    # Fix: Added observed=True to handle categorical data and .reset_index() to stabilize the dataframe for merging
+    age_breakdown_per_ntc = lane_type_df.groupby(['ntc_used', 'ageing_breakdown'], observed=True).size().unstack(fill_value=0).reset_index()
+
+    # Get counts for bags in docks
     docks_df = lane_type_df[lane_type_df['put_status'] == 'Docks']
     docks_counts = docks_df.groupby('ntc_used').size().reset_index(name='bags_in_docks')
+
+    # Merge all the data together
     ntc_summary = ntc_summary.merge(age_breakdown_per_ntc, on='ntc_used', how='left')
     ntc_summary = ntc_summary.merge(docks_counts, on='ntc_used', how='left').fillna(0)
-    if 'Invalid Age' in ntc_summary.columns: ntc_summary = ntc_summary.drop(columns=['Invalid Age'])
+
+    # Clean up and format the final output
+    if 'Invalid Age' in ntc_summary.columns:
+        ntc_summary = ntc_summary.drop(columns=['Invalid Age'])
+        
     ntc_summary['etd_string'] = ntc_summary['next_etd'].apply(lambda x: format_etd_string(x, current_time))
     ntc_summary = ntc_summary.drop(columns=['next_etd'])
+
     for col in ntc_summary.columns:
-        if 'hrs' in str(col) or col in ['total_wbns', 'bags_in_docks']: ntc_summary[col] = ntc_summary[col].astype(int)
+        if 'hrs' in str(col) or col in ['total_wbns', 'bags_in_docks']:
+            ntc_summary[col] = ntc_summary[col].astype(int)
+            
     return ntc_summary.sort_values(by='total_wbns', ascending=False).to_dict(orient='records')
     
 def get_put_predictor_insights(df, current_put_compliance):
