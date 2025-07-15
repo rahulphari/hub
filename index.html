@@ -1,791 +1,799 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hub In-Center Analytics</title>
+    <title>Ageing Analytics Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Roboto', sans-serif; background-color: #f0f2f5; }
-        .container { max-width: 1800px; margin: 1.5rem auto; padding: 1.5rem; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #0f172a; /* slate-900 */
+            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,0.05) 1px, transparent 0);
+            background-size: 2rem 2rem;
+        }
+        .container { max-width: 1600px; margin: 1.5rem auto; padding: 1.5rem; }
         .dashboard-header {
             background: linear-gradient(135deg, #1e3a8a, #3b82f6); color: white; padding: 2rem;
             border-radius: 0.75rem; margin-bottom: 2rem;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
         }
         .card {
-            background-color: #ffffff; border-radius: 0.75rem; padding: 1.5rem;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            background-color: #1e293b; /* slate-800 */
+            border: 1px solid #334155; /* slate-700 */
+            border-radius: 0.75rem; padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
         }
-        .metric-card {
-            @apply text-center p-6 rounded-lg shadow-lg cursor-pointer transition-all duration-300;
-            background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2);
+        .summary-card { cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .summary-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(30, 41, 59, 0.5), 0 4px 6px -2px rgba(30, 41, 59, 0.3);
         }
-        .metric-card:hover {
-            @apply transform -translate-y-1;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
-        }
-        .metric-value { @apply text-5xl font-black bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300; }
-        .metric-label { @apply text-sm font-bold uppercase text-blue-200 mt-1; }
-        .newsboard { background: #1f2937; color: #d1d5db; }
-        .ntc-table, .utilization-table { width: 100%; border-collapse: collapse; }
-        .ntc-table th, .ntc-table td, .utilization-table th, .utilization-table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid #4b5563; font-size: 0.8rem; }
-        .ntc-table th, .utilization-table th { background-color: #374151; color: #ffffff; font-weight: 600; padding-top: 0.5rem; padding-bottom: 0.5rem; }
-        .utilization-table td { vertical-align: top; }
-        .clickable-cell { @apply cursor-pointer transition-all duration-200; position: relative; }
-        .clickable-cell:hover { background-color: #dbeafe; color: #1e40af; font-weight: 600; }
-        .clickable-cell:hover::after { content: ''; position: absolute; left: 0.75rem; right: 0.75rem; bottom: 0.25rem; height: 1px; background-color: #1e40af; }
-        .summary-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
-        .summary-card { @apply p-4 rounded-lg text-center cursor-pointer transition-all duration-300; }
-        .summary-card:hover { @apply transform -translate-y-1 shadow-xl ring-2 ring-blue-500; }
         .data-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        .data-table th { @apply p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50 cursor-pointer select-none transition-colors duration-200; }
-        .data-table th:hover { @apply bg-gray-200 text-black; }
-        .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.875rem; vertical-align: top; }
-        .insight-alert { @apply text-sm list-item; }
-        
-        #loadingOverlay { transition: opacity 0.3s ease-in-out; }
-        .progress-bar-container { width: 80%; max-width: 600px; background-color: #374151; border-radius: 0.5rem; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        .progress-bar { height: 1.5rem; background: linear-gradient(90deg, #3b82f6, #10b981); width: 0%; }
-        @keyframes loading-animation { 0% { width: 0%; } 100% { width: 100%; } }
-
-        /* New Server Status Styles */
-        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; }
-        .status-dot.bg-green-500, .status-dot.bg-yellow-500 { animation: pulse 2s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .data-table th, .data-table td {
+            padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #334155; /* slate-700 */
+            font-size: 0.875rem;
+        }
+        .data-table th { background-color: #334155; /* slate-700 */ font-weight: 500; cursor: pointer; position: relative; }
+        .data-table th .sort-icon { opacity: 0.4; transition: opacity 0.2s, transform 0.2s; }
+        .data-table th:hover .sort-icon { opacity: 0.7; }
+        .data-table th.sorted-asc .sort-icon, .data-table th.sorted-desc .sort-icon { opacity: 1; color: #60a5fa; }
+        .data-table th.sorted-desc .sort-icon { transform: rotate(180deg); }
+        .data-table tbody tr:hover { background-color: #334155; /* slate-700 */ }
+        .shipment-indicator {
+            font-weight: bold; font-size: 0.7rem; padding: 0.1rem 0.3rem; border-radius: 99px;
+            margin-left: 4px; vertical-align: super; display: inline-block;
+        }
+        .indicator-h { background-color: #dc2626; color: #fef2f2; }
+        .indicator-l { background-color: #2563eb; color: #eff6ff; }
+        .scrollable-pane::-webkit-scrollbar { width: 8px; }
+        .scrollable-pane::-webkit-scrollbar-track { background: #1e293b; }
+        .scrollable-pane::-webkit-scrollbar-thumb { background: #475569; border-radius: 10px; }
+        .copy-filter-btn {
+            background-color: #334155; /* slate-700 */
+            color: #cbd5e1; /* slate-300 */
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: background-color 0.2s;
+        }
+        .copy-filter-btn.active {
+            background-color: #2563eb; /* blue-600 */
+            color: white;
+            font-weight: 600;
+        }
     </style>
 </head>
-<body>
-    <div id="loadingOverlay" class="hidden fixed inset-0 bg-gray-900 bg-opacity-80 z-50 flex flex-col items-center justify-center transition-opacity duration-300">
-        <div class="progress-bar-container mb-6">
-            <div id="progressBar" class="progress-bar"></div>
-        </div>
-        <p id="loadingMessage" class="text-white text-xl font-semibold text-center px-4 w-full max-w-2xl"></p>
+<body class="text-slate-200">
+
+<div class="container">
+    <div class="dashboard-header text-center">
+        <h1 class="text-4xl font-bold">Ageing Analytics Dashboard</h1>
+        <p class="mt-2 text-lg text-blue-200">Hubli_Budarshingi_H (Karnataka) Facility</p>
     </div>
 
-    <div id="copyModal" class="hidden fixed inset-0 bg-gray-900 bg-opacity-75 z-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
-            <h3 class="text-xl font-bold mb-4">Select Data to Copy</h3>
-            <div id="copy-columns-container" class="grid grid-cols-2 gap-2 mb-6"></div>
-            <div class="flex justify-end space-x-4">
-                <button id="closeCopyModalBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Cancel</button>
-                <button id="confirmCopyBtn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Copy Selected</button>
-            </div>
+    <div id="inputSection" class="card mb-6">
+        <div class="w-full max-w-2xl mx-auto">
+            <label for="csv-upload" id="upload-label" class="w-full cursor-pointer bg-slate-900/50 hover:bg-slate-700/70 border-2 border-dashed border-slate-600 rounded-lg flex flex-col items-center justify-center p-6 transition-all">
+                <svg class="w-10 h-10 text-slate-500 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" /></svg>
+                <span class="font-semibold text-lg text-slate-300">Upload a CSV file</span>
+                <span id="file-name" class="text-sm text-slate-400 mt-1">B2C or B2B Ageing Data</span>
+            </label>
+            <input type="file" id="csv-upload" class="hidden" accept=".csv, text/csv">
         </div>
+        <div id="messageArea" class="mt-4 text-center"></div>
     </div>
 
-    <div class="container">
-        <div class="dashboard-header text-center relative">
-            <h1 class="text-4xl font-bold">Hub In-Center Analytics</h1>
-            <p id="fileTimestamp" class="text-blue-200 text-lg">Instant Analytics for Peak Hub Performance</p>
-        </div>
+    <div id="resultsContainer" class="space-y-8">
+        <!-- Dashboards will be dynamically inserted here -->
+    </div>
+</div>
 
-        <div class="card mb-6 bg-gray-50 border border-gray-200">
-            <div class="flex items-center justify-between">
-                <div id="serverStatus" class="flex items-center space-x-2 text-sm">
-                    <span class="status-dot bg-yellow-500"></span>
-                    <span class="font-semibold text-gray-700">Server Status:</span>
-                    <span class="text-gray-600">Checking...</span>
-                </div>
-                <div class="text-xs text-gray-500 text-right">
-                    <p><strong>Note:</strong> This is a beta deployment hosted on a personal server with limited bandwidth.</p>
-                    <p>The server may go offline after periods of inactivity. Please refresh the page if there is any error.</p>
-                </div>
-            </div>
-        </div>
+<footer class="text-center py-8">
+    <div class="flex items-center justify-center space-x-2 text-xs text-slate-500 hover:text-slate-400 transition-colors duration-300">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zM3.735 3.15A2 2 0 0 1 5.416 2h5.168a2 2 0 0 1 1.681 1.15l.623 2.391c.118.453.133.934.034 1.385l-.265 1.138a2 2 0 0 1-1.996 1.625H5.416a2 2 0 0 1-1.996-1.625L3.19 8.026c-.1-.45-.083-.932.034-1.385l.623-2.391zM4.846 5.495a.5.5 0 0 0-.447.276L2.5 11.11a.5.5 0 0 0 .447.724h10.097a.5.5 0 0 0 .447-.724l-1.9-5.339a.5.5 0 0 0-.447-.276H4.846z"/>
+        </svg>
+        <p>
+            Designed & Crafted by Rh.
+            <span class="mx-1 opacity-50">|</span>
+            For Internal Use Only. Not for Propagation.
+        </p>
+    </div>
+</footer>
 
-        <div id="uploadSection" class="card mb-6">
-             <div class="flex items-center space-x-4">
-                <input type="file" id="fileUpload" accept=".csv" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-gray-300 rounded-lg cursor-pointer">
-                <button id="analyzeButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:shadow-lg transition-all transform hover:scale-105">Analyze</button>
-            </div>
-            <p class="text-xs text-gray-500 mt-3">
-                For accurate results, download the most recent Outbound EP file from 
-                <a href="https://eye.delhivery.com/#/dashboard?tab=outbound" target="_blank" class="text-blue-600 hover:underline">Delhivery Eye</a>.
-            </p>
-            <div id="messageArea" class="mt-4 text-center"></div>
-        </div>
-
-        <div id="welcomeSection" class="card mb-6 bg-gray-50">
-            <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">Welcome to Your Hub Analytics Co-Pilot!</h2>
-            <p class="text-center text-gray-600 mb-8">Upload your Outbound EP file to unlock powerful, real-time insights.</p>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
-                <div class="p-4">
-                    <div class="text-4xl mb-2">📊</div>
-                    <h3 class="font-bold text-lg">Instant KPIs</h3>
-                    <p class="text-sm text-gray-600">Get a live pulse on your hub's performance with key metrics like PUT %, TruPUT %, and total load.</p>
-                </div>
-                <div class="p-4">
-                    <div class="text-4xl mb-2">🔍</div>
-                    <h3 class="font-bold text-lg">Deep Dive</h3>
-                    <p class="text-sm text-gray-600">Click on any metric or category to instantly filter and view a detailed list of the underlying shipments and bags.</p>
-                </div>
-                 <div class="p-4">
-                    <div class="text-4xl mb-2">🪄</div>
-                    <h3 class="font-bold text-lg">Magic Filter</h3>
-                    <p class="text-sm text-gray-600">Create custom, multi-layered rules to slice and dice your data exactly the way you need it.</p>
-                </div>
+<!-- Copy Modal -->
+<div id="copyModal" class="fixed inset-0 bg-gray-900 bg-opacity-70 z-50 hidden items-center justify-center p-4">
+    <div class="bg-slate-800 p-6 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700">
+        <h3 class="text-xl font-bold mb-4 text-white">Customize Data to Copy</h3>
+        <!-- B2B Specific Filters -->
+        <div id="b2b-copy-filters" class="hidden mb-4">
+            <p class="text-sm font-medium text-slate-300 mb-2">Filter by Remark:</p>
+            <div class="flex space-x-2 rounded-lg bg-slate-900 p-1">
+                <button class="copy-filter-btn flex-1" data-filter="Controllable">Controllable</button>
+                <button class="copy-filter-btn flex-1" data-filter="Non-Controllable">Non-Controllable</button>
+                <button class="copy-filter-btn flex-1 active" data-filter="Both">Both</button>
             </div>
         </div>
-
-        <div id="resultsDisplay" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div class="lg:col-span-1 space-y-6">
-                    <div class="card bg-gray-800 text-white">
-                        <h2 class="text-2xl font-black text-center mb-6 uppercase tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-teal-300">Key Performance Indicators</h2>
-                        <div id="kpi-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div id="put-compliance-card" class="metric-card"><div id="putCompliance" class="metric-value">0%</div><div class="metric-label">PUT %</div></div>
-                            <div id="truput-card" class="metric-card"><div id="truput" class="metric-value">0%</div><div class="metric-label">TruPUT %</div></div>
-                            <div id="load-card" class="metric-card"><div id="loadInCenter" class="metric-value">0</div><div class="metric-label">Load In Center</div></div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <h3 class="text-lg font-bold mb-4">In-Center Breakdown</h3>
-                        <div class="space-y-6">
-                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Product Type</h4><div id="pdtBreakdown" class="summary-card-grid"></div></div>
-                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Priority</h4><div id="priorityBreakdown" class="summary-card-grid"></div></div>
-                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By Ageing</h4><div id="ageingBreakdown" class="summary-card-grid"></div></div>
-                            <div><h4 class="font-semibold text-gray-500 text-xs uppercase tracking-wider mb-2">By PUT Status</h4><div id="putStatusBreakdown" class="summary-card-grid"></div></div>
-                        </div>
-                    </div>
-                    <div class="card">
-                        <h3 class="text-lg font-bold">🪄 Magic Filter</h3>
-                        <div class="my-4">
-                            <div id="filter-rules-container" class="space-y-3"></div>
-                            <button id="add-rule-btn" class="mt-4 text-sm bg-blue-500 hover:bg-blue-600 text-white py-1 px-3 rounded-md">+ Add Rule</button>
-                        </div>
-                         <div class="flex items-center justify-between mt-4 bg-gray-50 p-3 rounded-md">
-                             <div><span class="font-semibold">Match</span><select id="filter-logic-selector" class="p-1 border rounded-md"><option value="AND">ALL</option><option value="OR">ANY</option></select><span class="font-semibold">rules.</span></div>
-                            <button id="apply-magic-filter-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg">Apply</button>
-                        </div>
-                    </div>
-                </div>
-                <div class="lg:col-span-1 space-y-6">
-                    <div class="card"><h3 class="text-lg font-bold mb-2">NTC Breakdown (FTL Lanes)</h3><div id="ftlBreakdown" class="max-h-[600px] overflow-y-auto"></div></div>
-                    <div class="card"><h3 class="text-lg font-bold mb-2">NTC Breakdown (Carting Lanes)</h3><div id="cartingBreakdown" class="max-h-[600px] overflow-y-auto"></div></div>
-                </div>
-                <div class="lg:col-span-1 card newsboard"><h2 class="text-2xl font-bold text-white border-b border-gray-600 pb-2 mb-4">Insights & Alerts</h2><div id="insights-container" class="space-y-6"></div></div>
+        <!-- Column Checkboxes -->
+        <div>
+            <p class="text-sm font-medium text-slate-300 mb-2">Select Columns to Copy:</p>
+            <div id="copy-column-checkboxes" class="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 bg-slate-900 rounded-md border border-slate-700">
+                <!-- Checkboxes will be injected here -->
             </div>
-            <div class="card mt-6">
-                <div class="flex justify-between items-center mb-4 border-b pb-2">
-                    <h2 class="text-xl font-bold text-gray-800" id="dynamicViewTitle">Detailed View</h2>
-                     <div class="flex space-x-2">
-                        <button id="copyDataBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
-                            📋 Copy
-                        </button>
-                    </div>
-                </div>
-                <div class="overflow-x-auto" id="dynamicDisplayBoard"><p class="text-gray-500" id="dynamic-view-placeholder">Click on any metric, category, or number to see detailed data here.</p></div>
-            </div>
+        </div>
+        <!-- Action Buttons -->
+        <div class="mt-6 flex justify-end space-x-4">
+            <button id="cancelCopyBtn" class="px-6 py-2 bg-slate-600 text-slate-100 font-semibold rounded-lg hover:bg-slate-500">Cancel</button>
+            <button id="confirmCopyBtn" class="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700">Copy Selected Data</button>
         </div>
     </div>
-    <script id="main-script">
-    function initializeApp() {
-        const fileUploadInput = document.getElementById('fileUpload'), analyzeButton = document.getElementById('analyzeButton'), messageArea = document.getElementById('messageArea');
-        const resultsDisplay = document.getElementById('resultsDisplay'), fileTimestampEl = document.getElementById('fileTimestamp'), dynamicDisplayBoard = document.getElementById('dynamicDisplayBoard');
-        const dynamicViewTitle = document.getElementById('dynamicViewTitle'), dynamicViewPlaceholder = document.getElementById('dynamic-view-placeholder');
-        const addRuleBtn = document.getElementById('add-rule-btn'), filterRulesContainer = document.getElementById('filter-rules-container'), applyMagicFilterBtn = document.getElementById('apply-magic-filter-btn');
-        const loadingOverlay = document.getElementById('loadingOverlay'), loadingMessage = document.getElementById('loadingMessage'), progressBar = document.getElementById('progressBar');
-        const welcomeSection = document.getElementById('welcomeSection');
-        const serverStatusDiv = document.getElementById('serverStatus');
-        
-        const copyDataBtn = document.getElementById('copyDataBtn');
-        const copyModal = document.getElementById('copyModal');
-        const closeCopyModalBtn = document.getElementById('closeCopyModalBtn');
-        const confirmCopyBtn = document.getElementById('confirmCopyBtn');
-        const copyColumnsContainer = document.getElementById('copy-columns-container');
+</div>
 
-        let currentSortKey = 'age_hours', isSortAscending = false, messageInterval;
-        let currentlyRenderedData = [];
 
-        // IMPORTANT: Replace this with the URL of your deployed Hub Analytics backend
-        const API_BASE_URL = 'https://hub-cuur.onrender.com';
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // --- Globals and DOM Element Caching ---
+    const WBN_BASE_URL = "https://hq.delhivery.com/p/pntrzz/";
+    const DEFAULT_FACILITY = "Hubli_Budarshingi_H (Karnataka)";
+    let fullB2CData = null;
+    let fullB2BData = null;
+    let currentSorts = { b2c: { key: 'sd_dif', order: 'desc' }, b2b: { key: 'ageing_days', order: 'desc' } };
+    let magicFilterDebounce;
 
-        // --- Server Status Check ---
-        async function checkServerStatus() {
-            try {
-                const response = await fetch(`${API_BASE_URL}/api/hub-status`);
-                if (response.ok) {
-                    const data = await response.json();
-                    serverStatusDiv.innerHTML = `
-                        <span class="status-dot bg-green-500"></span>
-                        <span class="font-semibold text-gray-700">Server Status:</span>
-                        <span class="text-green-700 font-bold">Online</span>
-                        <span class="text-gray-500 text-xs">(v${data.version})</span>`;
-                } else {
-                    throw new Error('Server responded with an error');
-                }
-            } catch (error) {
-                serverStatusDiv.innerHTML = `
-                    <span class="status-dot bg-red-500"></span>
-                    <span class="font-semibold text-gray-700">Server Status:</span>
-                    <span class="text-red-700 font-bold">Offline</span>`;
-            }
+    const resultsContainer = document.getElementById('resultsContainer');
+    const messageArea = document.getElementById('messageArea');
+    const csvUpload = document.getElementById('csv-upload');
+    const uploadLabel = document.getElementById('upload-label');
+    const fileNameEl = document.getElementById('file-name');
+    const copyModal = document.getElementById('copyModal');
+    const b2bCopyFilters = document.getElementById('b2b-copy-filters');
+    const copyColumnCheckboxes = document.getElementById('copy-column-checkboxes');
+    const cancelCopyBtn = document.getElementById('cancelCopyBtn');
+    const confirmCopyBtn = document.getElementById('confirmCopyBtn');
+
+    // --- File Upload and Processing ---
+    function handleFiles(files) {
+        const file = files[0];
+        if (!file || !file.type.match('text/csv')) {
+            if (file) showMessage("Please upload a valid CSV file.", true);
+            return;
         }
-
-        analyzeButton.addEventListener('click', handleAnalysis);
-        addRuleBtn.addEventListener('click', () => createFilterRule());
-        applyMagicFilterBtn.addEventListener('click', applyMagicFilter);
-
-        copyDataBtn.addEventListener('click', openCopyModal);
-        closeCopyModalBtn.addEventListener('click', () => copyModal.classList.add('hidden'));
-        confirmCopyBtn.addEventListener('click', copySelectedData);
-        
-        const loadingMessages = [
-            "Analyzing data integrity...",
-            "Did you know? You can click any number in the NTC tables to filter the detailed view.",
-            "Generating key performance indicators...",
-            "Did you know? The Magic Filter lets you combine multiple rules to find exactly what you're looking for.",
-            "Cross-referencing NTC and ETD data...",
-            "Building interactive breakdown cards...",
-            "Pro Tip: Check the 'Imminent Departures' insight to prioritize shipments for connections leaving soon.",
-            "Assembling the Insights & Alerts panel...",
-            "Fun Fact: This dashboard was co-created with AI to bring you the best possible analytics experience!",
-            "Finalizing the dashboard..."
-        ];
-
-        function showLoader(duration = 8000) {
-            loadingOverlay.classList.remove('hidden');
-            progressBar.style.animation = 'none';
-            progressBar.offsetHeight;
-            progressBar.style.animation = `loading-animation ${duration / 1000}s linear forwards`;
-
-            let msgIndex = 0;
-            loadingMessage.textContent = loadingMessages[msgIndex];
-            messageInterval = setInterval(() => {
-                msgIndex = (msgIndex + 1) % loadingMessages.length;
-                loadingMessage.textContent = loadingMessages[msgIndex];
-            }, 2000);
-        }
-
-        function hideLoader() {
-            loadingOverlay.classList.add('hidden');
-            clearInterval(messageInterval);
-        }
-        
-        function formatTimeAgo(date) {
-            const now = new Date();
-            const seconds = Math.round((now - date) / 1000);
-            const minutes = Math.round(seconds / 60);
-            const hours = Math.round(minutes / 60);
-            const days = Math.round(hours / 24);
-
-            if (seconds < 60) return "just now";
-            if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
-            if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
-            return `${days} day${days > 1 ? 's' : ''} ago`;
-        }
-
-        function showMessage(message, isError = false, duration = 5000) {
-            messageArea.innerHTML = message;
-            messageArea.className = `mt-4 text-center p-2 rounded-md transition-opacity duration-300 ${isError ? 'text-red-800 bg-red-100' : 'text-green-800 bg-green-100'}`;
-            setTimeout(() => {
-                messageArea.classList.add('opacity-0');
-            }, duration - 500);
-             setTimeout(() => {
-                messageArea.innerHTML = '';
-                messageArea.classList.remove('opacity-0');
-            }, duration);
-        }
-        
-        async function handleAnalysis() {
-            const file = fileUploadInput.files[0];
-            if (!file) { showMessage('Please select a file first.', true); return; }
-            
-            const minLoadingTime = 8000;
-            showLoader(minLoadingTime);
-            welcomeSection.classList.add('hidden');
-            resultsDisplay.classList.add('hidden');
-            analyzeButton.disabled = true;
-            messageArea.innerHTML = '';
-
-            const analysisPromise = new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    try {
-                        const fileDate = new Date(file.lastModified);
-                        const response = await fetch(`${API_BASE_URL}/api/hub-analytics`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ csv_content: e.target.result, file_timestamp: fileDate.toISOString() })
-                        });
-                        const resData = await response.json();
-                        if (!response.ok) { throw new Error(resData.error || 'Analysis failed.'); }
-                        
-                        window.currentAnalysisData = resData;
-                        const formattedDate = fileDate.toLocaleString('en-US', { hour12: true, dateStyle: 'long', timeStyle: 'medium' });
-                        fileTimestampEl.textContent = `Data from: ${formattedDate}`;
-                        
-                        renderDashboard(window.currentAnalysisData);
-                        applyFiltersAndRender([]); 
-                        filterRulesContainer.innerHTML = '';
-                        createFilterRule();
-                        
-                        const timeAgo = formatTimeAgo(fileDate);
-                        showMessage(`<strong>Analysis Complete.</strong> Displaying data from "<em>${file.name}</em>" (file is ${timeAgo}).`, false);
-                        resolve();
-                    } catch (error) {
-                        reject(error);
-                    }
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsText(file);
-            });
-
-            const timerPromise = new Promise(resolve => setTimeout(resolve, minLoadingTime));
-
-            try {
-                await Promise.all([analysisPromise, timerPromise]);
-                resultsDisplay.classList.remove('hidden');
-            } catch (error) {
-                showMessage(`<strong>Error:</strong> ${error.message}`, true);
-                welcomeSection.classList.remove('hidden');
-            } finally {
-                hideLoader();
-                analyzeButton.disabled = false;
-            }
-        }
-
-        function applyFiltersAndRender(filters) {
-            let filteredData = window.currentAnalysisData.detailed_data;
-            let titleParts = [];
-            if (filters.length > 0) {
-                filters.forEach(filter => {
-                    let key = filter.key, value = filter.value, op = filter.op || '==';
-                    titleParts.push(`${(filter.label || key).replace(/_/g,' ')} ${op.replace('==','=')} ${value}`);
-                    filteredData = filteredData.filter(row => {
-                        if (!row || row[key] === null || row[key] === undefined) return false;
-                        const rowValue = row[key];
-                        switch(op) {
-                            case '>': return rowValue > value; case '>=': return rowValue >= value;
-                            case '<': return rowValue < value; case '<=': return rowValue <= value;
-                            case '!=': return rowValue != value;
-                            case 'contains': return String(rowValue).toLowerCase().includes(String(value).toLowerCase());
-                            default: return rowValue == value;
-                        }
-                    });
-                });
-            }
-            
-            let shipmentCount = 0;
-            let bagCount = 0;
-            filteredData.forEach(row => {
-                if (row.bag_id && /^\d+$/.test(row.bag_id)) {
-                    shipmentCount++;
-                } else {
-                    bagCount++;
-                }
-            });
-            const countText = `(${shipmentCount} Shipments | ${bagCount} Bags)`;
-
-            if (filters.length > 0) {
-                 dynamicViewTitle.textContent = `Detailed View: ${titleParts.join(' AND ')} ${countText}`;
-            } else {
-                 dynamicViewTitle.textContent = `Detailed View: All In-Center Shipments ${countText}`;
-            }
-
-            renderDetailedTable(filteredData);
-        }
-        
-        function renderDashboard(data) {
-            document.getElementById('putCompliance').textContent = data.key_metrics.put_compliance;
-            document.getElementById('truput').textContent = data.key_metrics.truput;
-            document.getElementById('loadInCenter').textContent = data.key_metrics.load_in_center;
-            document.getElementById('load-card').onclick = () => applyFiltersAndRender([]);
-            document.getElementById('put-compliance-card').onclick = () => applyFiltersAndRender([{ key: 'age_hours', op: '>', value: 2, label: 'PUT % contributors' }]);
-            document.getElementById('truput-card').onclick = () => applyFiltersAndRender([{ key: 'put_status', op: '!=', value: 'Put Pending', label: 'TruPUT contributors' }]);
-            renderBreakdownCards('pdtBreakdown', data.breakdowns.pdt, 'bg-green-50 text-green-800', 'pdt');
-            renderBreakdownCards('priorityBreakdown', data.breakdowns.priority, 'bg-yellow-50 text-yellow-800', 'priority');
-            renderBreakdownCards('putStatusBreakdown', data.breakdowns.put_status, 'bg-blue-50 text-blue-800', 'put_status');
-            renderBreakdownCards('ageingBreakdown', data.breakdowns.ageing, 'bg-red-50 text-red-800', 'ageing_breakdown');
-            renderNtcTable('ftlBreakdown', data.ntc_breakdowns.ftl, 'FTL');
-            renderNtcTable('cartingBreakdown', data.ntc_breakdowns.carting, 'Carting');
-            if(data.insights) renderInsights(data.insights);
-        }
-
-        function renderBreakdownCards(elementId, breakdownData, colorClasses, filterKey) {
-            const container = document.getElementById(elementId);
-            container.innerHTML = '';
-            const keyOrder = { 'ageingBreakdown': ['<24 hrs', '24-48 hrs', '48-72 hrs', '72+ hrs'] };
-            const sortedKeys = keyOrder[elementId] || Object.keys(breakdownData).sort();
-            for (const key of sortedKeys) {
-                if (!breakdownData.hasOwnProperty(key)) continue;
-                const card = document.createElement('div');
-                card.className = `summary-card ${colorClasses}`;
-                card.onclick = () => applyFiltersAndRender([{ key: filterKey, value: key }]);
-                card.innerHTML = `<div class="font-semibold text-sm">${key}</div><div class="font-bold text-xl">${breakdownData[key]}</div>`;
-                container.appendChild(card);
-            }
-        }
-        
-        function renderNtcTable(elementId, ntcData, title) {
-            const container = document.getElementById(elementId);
-            if (!ntcData || ntcData.length === 0) {
-                container.innerHTML = `<p class="text-gray-500 text-center p-4">No ${title} lane data available.</p>`;
-                return;
-            }
-
-            const table = document.createElement('table');
-            table.className = 'ntc-table';
-            table.innerHTML = `<thead><tr><th>NTC</th><th>Total</th><th>&lt;24 hrs</th><th>24+ hrs</th><th>Bags in Docks</th></tr></thead>`;
-            
-            const tableBody = document.createElement('tbody');
-            ntcData.forEach(row => {
-                const tr = document.createElement('tr');
-                const ntcCell = document.createElement('td');
-                ntcCell.className = 'clickable-cell font-semibold';
-                ntcCell.innerHTML = `${row.ntc_used}<div class="text-xs text-gray-500 font-normal italic">${row.etd_string || ''}</div>`;
-                ntcCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
-                tr.appendChild(ntcCell);
-                const totalCell = document.createElement('td');
-                totalCell.className = 'clickable-cell text-center';
-                totalCell.textContent = row.total_wbns;
-                totalCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }]);
-                tr.appendChild(totalCell);
-                const lessThan24Cell = document.createElement('td');
-                lessThan24Cell.className = 'clickable-cell text-center';
-                lessThan24Cell.textContent = row['<24 hrs'] || 0;
-                lessThan24Cell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "age_hours", op: '<', value: 24, label: 'age' }]);
-                tr.appendChild(lessThan24Cell);
-                const over24Value = (row['24-48 hrs'] || 0) + (row['48-72 hrs'] || 0) + (row['72+ hrs'] || 0);
-                const over24Cell = document.createElement('td');
-                over24Cell.className = 'clickable-cell text-center';
-                over24Cell.textContent = over24Value;
-                over24Cell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "age_hours", op: '>=', value: 24, label: 'age' }]);
-                tr.appendChild(over24Cell);
-                const docksCell = document.createElement('td');
-                docksCell.className = 'clickable-cell text-center font-bold';
-                docksCell.textContent = row.bags_in_docks || 0;
-                docksCell.onclick = () => applyFiltersAndRender([{ key: "ntc_used", value: row.ntc_used }, { key: "put_status", value: "Docks" }]);
-                tr.appendChild(docksCell);
-                tableBody.appendChild(tr);
-            });
-            
-            table.appendChild(tableBody);
-            container.innerHTML = '';
-            container.appendChild(table);
-        }
-
-        function renderDetailedTable(data) {
-            currentlyRenderedData = data;
-            dynamicViewPlaceholder.style.display = 'none';
-            if (!data || data.length === 0) { 
-                dynamicDisplayBoard.innerHTML = '<p class="text-gray-500 p-4">No detailed data for this selection.</p>'; 
-                copyDataBtn.disabled = true;
-                return; 
-            }
-            copyDataBtn.disabled = false;
-
-            const sortData = (data, key, ascending) => {
-                return [...data].sort((a, b) => {
-                    const valA = a[key], valB = b[key];
-                    if (valA === null || valA === undefined) return 1; if (valB === null || valB === undefined) return -1;
-                    if (typeof valA === 'number' && typeof valB === 'number') return ascending ? valA - valB : valB - valA;
-                    return String(valA).localeCompare(String(valB), undefined, {numeric: true}) * (ascending ? 1 : -1);
-                });
-            };
-            const sortedData = sortData(data, currentSortKey, isSortAscending);
-            const headers = ['BAG ID', 'NTC', 'AGE', 'PUT STATUS', 'INCOMING TIME'];
-            const headerKeys = {'BAG ID': 'bag_id', 'NTC': 'ntc_used', 'AGE': 'age_hours', 'PUT STATUS': 'put_status', 'INCOMING TIME': 'incoming_time_dt'};
-            const table = document.createElement('table');
-            table.className = 'data-table';
-            const thead = document.createElement('thead');
-            let headerRowHtml = '<tr>';
-            headers.forEach(h => {
-                const sortIndicator = headerKeys[h] === currentSortKey ? (isSortAscending ? ' ▲' : ' ▼') : '';
-                headerRowHtml += `<th data-sort-key="${headerKeys[h]}">${h}${sortIndicator}</th>`;
-            });
-            headerRowHtml += '</tr>';
-            thead.innerHTML = headerRowHtml;
-            const tbody = document.createElement('tbody');
-            sortedData.forEach(row => {
-                const tr = document.createElement('tr');
-                headers.forEach(h => {
-                    const td = document.createElement('td');
-                    let cellContent = '';
-                    switch (h) {
-                        case 'BAG ID':
-                            const id = row.bag_id; const isShipment = /^\d+$/.test(id);
-                            const url = isShipment ? `https://hq.delhivery.com/p/pntrzz/${id}/` : `https://hq.delhivery.com/bag/${id}/`;
-                            cellContent = `<div><a href="${url}" target="_blank" class="text-blue-600 hover:underline font-semibold">${id}</a></div><div class="text-xs text-gray-600">(${row.pdt} | ${row.priority})</div>`;
-                            break;
-                        case 'NTC': cellContent = row.ntc_used; break;
-                        case 'AGE': cellContent = row.age_str; break;
-                        case 'PUT STATUS': cellContent = `<div class="font-semibold">${row.put_status}</div><div class="text-xs text-gray-500">${row.putaway_location || 'N/A'}</div>`; break;
-                        case 'INCOMING TIME': cellContent = row.incoming_time_dt ? new Date(row.incoming_time_dt).toLocaleString() : 'N/A'; break;
-                        default: cellContent = 'N/A';
-                    }
-                    td.innerHTML = cellContent;
-                    tr.appendChild(td);
-                });
-                tbody.appendChild(tr);
-            });
-            table.appendChild(thead);
-            table.appendChild(tbody);
-            dynamicDisplayBoard.innerHTML = '';
-            dynamicDisplayBoard.appendChild(table);
-            dynamicDisplayBoard.querySelectorAll('th').forEach(th => {
-                th.addEventListener('click', () => {
-                    const newSortKey = th.dataset.sortKey;
-                    if (currentSortKey === newSortKey) { isSortAscending = !isSortAscending; } 
-                    else { currentSortKey = newSortKey; isSortAscending = true; }
-                    renderDetailedTable(data);
-                });
-            });
-        }
-        
-        const copyableColumns = {
-            'bag_id': 'Bag/Shipment ID', 'ntc_used': 'NTC', 'age_str': 'Age', 'put_status': 'PUT Status',
-            'putaway_location': 'PUT Location', 'pdt': 'Product Type', 'priority': 'Priority', 'incoming_time_dt': 'Incoming Time'
+        fileNameEl.textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            processData(event.target.result);
         };
+        reader.onerror = () => {
+            showMessage("Error reading file.", true);
+        };
+        reader.readAsText(file);
+    }
 
-        function openCopyModal() {
-            copyColumnsContainer.innerHTML = '';
-            Object.entries(copyableColumns).forEach(([key, label]) => {
-                const isChecked = ['bag_id', 'ntc_used', 'age_str', 'put_status'].includes(key);
-                const checkboxHtml = `<label class="flex items-center space-x-2 cursor-pointer"><input type="checkbox" value="${key}" class="form-checkbox h-5 w-5 text-blue-600 rounded" ${isChecked ? 'checked' : ''}><span class="text-gray-700">${label}</span></label>`;
-                copyColumnsContainer.insertAdjacentHTML('beforeend', checkboxHtml);
-            });
-            copyModal.classList.remove('hidden');
+    csvUpload.addEventListener('change', (e) => handleFiles(e.target.files));
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        uploadLabel.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        uploadLabel.addEventListener(eventName, () => uploadLabel.classList.add('bg-slate-700', 'border-blue-500'), false);
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        uploadLabel.addEventListener(eventName, () => uploadLabel.classList.remove('bg-slate-700', 'border-blue-500'), false);
+    });
+    uploadLabel.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files), false);
+
+    function parseCsvLine(line) {
+        const results = [];
+        const regex = /(?:^|,)(\"(?:[^\"]+|\"\")*\"|[^,]*)/g;
+        let match;
+        while (match = regex.exec(line)) {
+            let value = match[1];
+            if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.slice(1, -1).replace(/""/g, '"');
+            }
+            results.push(value.trim());
         }
+        return results;
+    }
 
-        function copySelectedData() {
-            const selectedColumns = Array.from(copyColumnsContainer.querySelectorAll('input:checked')).map(cb => cb.value);
-            if (selectedColumns.length === 0) { alert("Please select at least one column to copy."); return; }
-            const headerText = dynamicViewTitle.textContent;
-            let textToCopy = `${headerText}\n\n`;
-            textToCopy += selectedColumns.map(key => copyableColumns[key]).join('\t') + '\n';
-            currentlyRenderedData.forEach(row => {
-                const rowData = selectedColumns.map(key => {
-                    let value = row[key] || 'N/A';
-                    if (key === 'incoming_time_dt') { value = value ? new Date(value).toLocaleString() : 'N/A'; }
-                    return value;
+    function processData(csvString) {
+        resultsContainer.innerHTML = '<p class="text-center text-slate-400">Processing...</p>';
+        
+        try {
+            const lines = csvString.trim().split('\n');
+            const headerLine = lines[0].trim();
+            const rawHeaders = parseCsvLine(headerLine);
+            const headers = rawHeaders.map(h => h.replace(/[^a-zA-Z0-9_]/g, '').toLowerCase());
+            
+            const data = lines.slice(1).map(line => {
+                const values = parseCsvLine(line.trim());
+                const obj = {};
+                headers.forEach((header, i) => {
+                    obj[header] = values[i] || '';
                 });
-                textToCopy += rowData.join('\t') + '\n';
+                return obj;
             });
-            copyTextToClipboard(textToCopy);
-            copyModal.classList.add('hidden');
-        }
 
-        function copyTextToClipboard(text) {
-            const textArea = document.createElement("textarea");
-            textArea.style.position = 'fixed'; textArea.style.top = '-9999px'; textArea.style.left = '-9999px';
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.focus(); textArea.select();
-            try {
-                document.execCommand('copy');
-                showMessage('Copied to clipboard!', false, 3000);
-            } catch (err) {
-                showMessage('Failed to copy.', true, 3000);
+            if (headers.includes('sd_dif') && headers.includes('ndc')) {
+                fullB2CData = analyze_b2c_data(data);
+                if(fullB2CData) renderB2CDashboard(fullB2CData);
+                else showMessage('No valid B2C data found for the specified facility.', true);
+            } else if (headers.includes('ageing_days') && headers.includes('controllable_remark')) {
+                fullB2BData = analyze_b2b_data(data);
+                if(fullB2BData) renderB2BDashboard(fullB2BData);
+                else showMessage('No valid B2B data found for the specified facility.', true);
+            } else {
+                showMessage('Could not determine data type. Please upload a valid B2C or B2B ageing file.', true);
             }
-            document.body.removeChild(textArea);
+        } catch (error) {
+            console.error("Processing Error:", error);
+            showMessage(`An error occurred during processing: ${error.message}`, true);
         }
+    }
 
-        function renderInsights(insights) {
-            const container = document.getElementById('insights-container');
-            container.innerHTML = ''; 
-            const insightOrder = ['put_predictor', 'imminent_departures', 'load_analysis', 'carting_at_docks', 'unknown_ntcs'];
-            const createClickableSpan = (text, filters, colorClass) => {
-                const span = document.createElement('span');
-                span.className = `font-bold underline cursor-pointer ${colorClass}`;
-                span.textContent = text;
-                span.onclick = () => applyFiltersAndRender(filters);
-                return span;
+    // --- ANALYSIS FUNCTIONS (Ported from Python) ---
+    function analyze_b2c_data(data) {
+        let df = data.filter(row => row.facility === DEFAULT_FACILITY);
+        if (df.length === 0) return null;
+
+        df = df.map(row => ({
+            ...row,
+            wbn: String(row.wbn || '').replace(/[^0-9]/g, ''),
+            sd_dif: parseFloat(row.sd_dif),
+            large: String(row.large || '').toUpperCase() === 'TRUE',
+            aging_bucket: row.aging_bucket || 'Unknown',
+            producttype: row.producttype || 'Unknown',
+            status: row.status || 'Unknown',
+            ndc: row.ndc || 'Unknown',
+        })).filter(row => !isNaN(row.sd_dif));
+
+        const totalWBNs = df.length;
+        const ageBreakdown = df.reduce((acc, row) => ({...acc, [row.aging_bucket]: (acc[row.aging_bucket] || 0) + 1}), {});
+        const productBreakdown = df.reduce((acc, row) => ({...acc, [row.producttype]: (acc[row.producttype] || 0) + 1}), {});
+        const statusBreakdown = df.reduce((acc, row) => ({...acc, [row.status]: (acc[row.status] || 0) + 1}), {});
+
+        const ndcSummaryMap = df.reduce((acc, row) => {
+            if (!acc[row.ndc]) acc[row.ndc] = { total_ageing_wbns: 0, age_gt_96: 0 };
+            acc[row.ndc].total_ageing_wbns++;
+            if (row.aging_bucket === '>96') acc[row.ndc].age_gt_96++;
+            return acc;
+        }, {});
+        const ndcSummary = Object.entries(ndcSummaryMap).map(([ndc, values]) => ({ ndc, ...values }))
+            .sort((a, b) => b.total_ageing_wbns - a.total_ageing_wbns);
+
+        return {
+            summary: { totalWBNs, ageBreakdown, productBreakdown, statusBreakdown },
+            ndcSummary,
+            detailedWBNs: df,
+        };
+    }
+
+    function analyze_b2b_data(data) {
+        let df = data.filter(row => row.facility === DEFAULT_FACILITY);
+        if (df.length === 0) return null;
+
+        df = df.map(row => {
+            const ageing_days = parseFloat(row.ageing_days) || 0;
+            let ageing_bucket_hrs;
+            if (ageing_days < 2) ageing_bucket_hrs = '<48';
+            else if (ageing_days < 3) ageing_bucket_hrs = '48-72';
+            else if (ageing_days < 4) ageing_bucket_hrs = '72-96';
+            else ageing_bucket_hrs = '>96';
+
+            return {
+                ...row,
+                controllable_remark: row.controllable_remark || 'Unknown',
+                sub_remark: row.sub_remark || 'Unknown',
+                put_remarks: row.put_remarks || 'Unknown',
+                ntc: row.ntc || 'Unknown',
+                client: row.client || 'Unknown',
+                cs_sr: row.cs_sr || 'Unknown',
+                not_put_wbns: row.not_put_wbns || 'Unknown',
+                ageing_days: ageing_days,
+                ageing_bucket_hrs: ageing_bucket_hrs,
+                remark_combined: `${row.controllable_remark || 'Unknown'} | ${row.sub_remark || 'Unknown'}`,
+                put_combined: `${row.put_remarks || 'Unknown'} | ${row.not_put_wbns || 'Unknown'}`,
             };
-            const renderFunctions = {
-                put_predictor: (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-blue-400">PUT Predictor</h3>`;
-                    const contentDiv = document.createElement('div');
-                    contentDiv.className = 'text-sm mt-2 space-y-3'; let hasContent = false;
-                    if (data.at_risk_15m.count > 0 || data.at_risk_30m.count > 0) {
-                        const p1 = document.createElement('p');
-                        p1.append(createClickableSpan(data.total_pending, [{key: 'put_status', value: 'Put Pending'}], 'text-white'));
-                        p1.innerHTML += ` PUT PENDING of which `;
-                        p1.append(createClickableSpan(data.at_risk_15m.count, [{key: 'put_status', value: 'Put Pending'}, {key: 'age_hours', op: '>=', value: 1.75}, {key: 'age_hours', op: '<', value: 2.0}], 'text-yellow-300'));
-                        p1.innerHTML += ` will cross 2hr in next 15 mins. PUT % may drop by <span class="font-bold text-red-400">${data.at_risk_15m.put_drop}</span>.`;
-                        contentDiv.appendChild(p1); hasContent = true;
-                    }
-                    if (data.critical_4h_plus.count > 0) {
-                        const p2 = document.createElement('p');
-                        p2.append(createClickableSpan(data.critical_4h_plus.count, [{key: 'put_status', value: 'Put Pending'}, {key: 'age_hours', op: '>', value: 4}], 'text-red-400'));
-                        p2.innerHTML += ` shipments are PUT PENDING for >4 hours. <span class="font-bold text-red-500">Track immediately.</span>`;
-                        contentDiv.appendChild(p2); hasContent = true;
-                    }
-                    if (data.target_rate.needed) {
-                        const p3 = document.createElement('p');
-                        p3.className = 'text-green-300';
-                        p3.innerHTML = `🎯 To reach 95% PUT, <span class="font-bold text-white">${data.target_rate.rate}</span> shipments from the >2hr backlog must be cleared.`;
-                        contentDiv.appendChild(p3); hasContent = true;
-                    }
-                    if (!hasContent) { contentDiv.innerHTML = `<p class="text-green-300">✅ No immediate PUT risks detected.</p>`; }
-                    wrapper.appendChild(contentDiv); return wrapper;
-                },
-                imminent_departures: (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-orange-400">Imminent Departures at Risk</h3>`;
-                    if(!data || data.length === 0) { wrapper.innerHTML += `<p class="text-sm mt-2 text-green-300">✅ No pending shipments for imminent departures.</p>`; return wrapper; }
-                    const table = document.createElement('table');
-                    table.className = 'w-full text-left text-xs mt-2';
-                    table.innerHTML = `<thead><tr class="border-b border-gray-600"><th class="py-1">NTC</th><th class="py-1 text-center">Pending</th><th class="py-1">Departs In</th><th class="py-1">Recommendation</th></tr></thead>`;
-                    const tbody = document.createElement('tbody');
-                    data.forEach(item => {
-                        let recColor = 'text-gray-300';
-                        if(item.recommendation === 'High Priority Put') recColor = 'text-yellow-400';
-                        if(item.recommendation === 'CRITICAL: Cross-Dock') recColor = 'text-red-500 font-bold';
-                        const tr = document.createElement('tr');
-                        tr.className = 'border-b border-gray-700 hover:bg-gray-700';
-                        tr.innerHTML = `<td class="py-2 cursor-pointer">${item.ntc_used}</td><td class="py-2 cursor-pointer text-center">${item.pending_count}</td><td class="py-2">${item.departs_in_mins} mins</td><td class="py-2 ${recColor}">${item.recommendation}</td>`;
-                        tr.querySelector('td:nth-child(1)').onclick = () => applyFiltersAndRender([{key: 'ntc_used', value: item.ntc_used}]);
-                        tr.querySelector('td:nth-child(2)').onclick = () => applyFiltersAndRender([{key: 'ntc_used', value: item.ntc_used}, {key: 'put_status', value: 'Put Pending'}]);
-                        tbody.appendChild(tr);
-                    });
-                    table.appendChild(tbody);
-                    wrapper.appendChild(table); return wrapper;
-                },
-                load_analysis: (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-cyan-400">Load Analysis</h3>`;
-                    if (data.load_alerts && data.load_alerts.length > 0) {
-                        const alertContainer = document.createElement('ul');
-                        alertContainer.className = 'mt-2 ml-4 space-y-1';
-                        data.load_alerts.forEach(alertText => { 
-                            const li = document.createElement('li');
-                            li.className = 'insight-alert text-yellow-300';
-                            let futureAlertText = alertText.replace('is using', 'will use an estimated');
-                            li.innerHTML = `⚠️ ${futureAlertText}`;
-                            alertContainer.appendChild(li); 
-                        });
-                        wrapper.appendChild(alertContainer);
-                    }
-                    if (data.adhoc_suggestions && data.adhoc_suggestions.length > 0) {
-                        const adhocContainer = document.createElement('div');
-                        adhocContainer.className = 'mt-2 space-y-1';
-                        data.adhoc_suggestions.forEach(suggestion => { const p = document.createElement('p'); p.className = 'text-sm p-2 rounded-md bg-red-900 text-white border border-red-700'; p.innerHTML = `🚨 ${suggestion}`; adhocContainer.appendChild(p); });
-                        wrapper.appendChild(adhocContainer);
-                    }
-                    if (data.utilization_table && data.utilization_table.length > 0) {
-                        const subhead = document.createElement('p');
-                        subhead.className = 'text-sm mt-4 mb-2 text-gray-300';
-                        subhead.textContent = 'Expected utilization for departures in next 3 hours:';
-                        wrapper.appendChild(subhead);
-                        const tableDiv = document.createElement('div');
-                        tableDiv.className = 'overflow-x-auto';
-                        let tableHTML = `<table class="utilization-table text-xs w-full"><thead><tr><th class="text-left w-2/5 py-2">NTC</th><th class="text-right py-2">Exp. Util<br>(PUT)</th><th class="text-right py-2">Exp. Util<br>(NOT PUT)</th><th class="text-right py-2">Total<br>In-Center</th><th class="text-right py-2">Max Possible<br>Util</th></tr></thead><tbody>`;
-                        data.utilization_table.forEach(row => { tableHTML += `<tr><td class="text-left"><div class="font-semibold">${row.ntc}</div><div class="text-gray-400">${row.next_connection}</div><div class="text-gray-400 italic text-xs">${row.vehicle_size}</div></td><td class="text-right"><div>${row.put_util_v.toFixed(1)}% (V)</div><div>${row.put_util_w.toFixed(1)}% (W)</div></td><td class="text-right"><div>${row.not_put_util_v.toFixed(1)}% (V)</div><div>${row.not_put_util_w.toFixed(1)}% (W)</div></td><td class="text-right"><div>${row.total_util_v.toFixed(1)}% (V)</div><div>${row.total_util_w.toFixed(1)}% (W)</div></td><td class="text-right font-bold bg-gray-900"><div>${row.max_util_v.toFixed(1)}% (V)</div><div>${row.max_util_w.toFixed(1)}% (W)</div></td></tr>`; });
-                        tableHTML += `</tbody></table>`;
-                        tableDiv.innerHTML = tableHTML;
-                        wrapper.appendChild(tableDiv);
-                    }
-                    return wrapper;
-                },
-                carting_at_docks: (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-teal-400">Carting at Docks Alert</h3>`;
-                    if(!data || data.length === 0) { wrapper.innerHTML += `<p class="text-sm mt-2 text-green-300">✅ No carting shipments found at docks.</p>`; return wrapper; }
-                    wrapper.innerHTML += `<p class="text-sm mt-2">Move these carting shipments from Docks to Floor:</p>`;
-                    const ul = document.createElement('ul');
-                    ul.className = 'text-sm list-disc list-inside mt-2 space-y-1';
-                    data.forEach(item => {
-                        const li = document.createElement('li');
-                        li.className = 'p-1 cursor-pointer hover:bg-gray-700 rounded-md';
-                        const filters = [{key: 'ntc_used', value: item.ntc_used}, {key: 'put_status', value: 'Docks'}];
-                        li.append(createClickableSpan(item.count, filters, 'text-teal-300'));
-                        li.innerHTML += ` shipments for NTC <span class="font-bold">${item.ntc_used}</span> (ETD: ${item.etd_str})`;
-                        li.onclick = () => applyFiltersAndRender(filters);
-                        ul.appendChild(li);
-                    });
-                    wrapper.appendChild(ul); return wrapper;
-                },
-                unknown_ntcs: (data) => {
-                    const wrapper = document.createElement('div');
-                    wrapper.innerHTML = `<h3 class="text-lg font-semibold text-red-500">Unclassified NTCs Detected</h3><p class="text-sm mt-2">The following NTCs are not in the mapping:</p><div class="mt-2 p-2 bg-gray-800 rounded-md text-xs font-mono">${data.join(', ')}</div>`;
-                    return wrapper;
-                }
-            };
-            insightOrder.forEach(key => {
-                const insightData = insights[key];
-                if (!insightData) return;
-                let shouldRender = true;
-                if((key === 'unknown_ntcs' || key === 'carting_at_docks' || key === 'imminent_departures') && insightData.length === 0) shouldRender = false;
-                if(key === 'load_analysis' && insightData.utilization_table.length === 0 && insightData.load_alerts.length === 0 && insightData.adhoc_suggestions.length === 0) shouldRender = false;
-                if(shouldRender) {
-                    const insightElement = renderFunctions[key](insightData);
-                    if (insightElement) { container.appendChild(insightElement); }
-                }
-            });
+        });
+
+        const totalWBNs = df.length;
+        const controllableBreakdownMap = df.reduce((acc, row) => {
+            const key = `${row.controllable_remark}__${row.sub_remark}`;
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+        const controllableBreakdown = Object.entries(controllableBreakdownMap).map(([key, count]) => {
+            const [controllable_remark, sub_remark] = key.split('__');
+            return { controllable_remark, sub_remark, count };
+        });
+        const ageingBreakdown = df.reduce((acc, row) => ({...acc, [row.ageing_bucket_hrs]: (acc[row.ageing_bucket_hrs] || 0) + 1}), {});
+        const putBreakdown = df.reduce((acc, row) => ({...acc, [row.put_remarks]: (acc[row.put_remarks] || 0) + 1}), {});
+
+        const controllable_df = df.filter(row => row.controllable_remark === 'Controllable');
+        const ntcSummaryMap = controllable_df.reduce((acc, row) => {
+            if (!acc[row.ntc]) acc[row.ntc] = { total_wbns: 0, age_gt_96: 0 };
+            acc[row.ntc].total_wbns++;
+            if (row.ageing_bucket_hrs === '>96') acc[row.ntc].age_gt_96++;
+            return acc;
+        }, {});
+        const ntcSummary = Object.entries(ntcSummaryMap).map(([ntc, values]) => ({ ntc, ...values })).sort((a,b) => b.total_wbns - a.total_wbns);
+        const clientSummaryMap = controllable_df.reduce((acc, row) => {
+            if (!acc[row.client]) acc[row.client] = { total_wbns: 0, age_gt_96: 0 };
+            acc[row.client].total_wbns++;
+            if (row.ageing_bucket_hrs === '>96') acc[row.client].age_gt_96++;
+            return acc;
+        }, {});
+        const clientSummary = Object.entries(clientSummaryMap).map(([client, values]) => ({ client, ...values })).sort((a,b) => b.total_wbns - a.total_wbns);
+            
+        return {
+            summary: { totalWBNs, controllableBreakdown, ageingBreakdown, putBreakdown },
+            ntcSummary, clientSummary, detailedWBNs: df,
+        };
+    }
+
+    // --- RENDERERS ---
+    function renderB2CDashboard(data) {
+        const dashboardId = 'b2c-dashboard';
+        const dashboardHtml = `
+            <div id="${dashboardId}" class="space-y-8 dashboard-instance">
+                <h2 class="text-3xl font-bold text-slate-100 border-b border-slate-700 pb-2">B2C/Heavy Dashboard</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card">
+                        <h2 class="text-2xl font-bold text-slate-100 mb-4">Ageing Summary</h2>
+                        <div class="space-y-6">
+                            <div class="summary-card text-center bg-slate-700/50 rounded-lg p-4" data-type="b2c" data-filter-key="all">
+                                <p class="text-sm font-medium text-blue-400">Total Ageing WBNs</p>
+                                <p class="text-4xl font-bold text-white mt-2">${data.summary.totalWBNs}</p>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Ageing Breakdown</h4>
+                                <div id="b2c-ageing-breakdown" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Product Type</h4>
+                                <div id="b2c-product-breakdown" class="grid grid-cols-1 sm:grid-cols-2 gap-4"></div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Status</h4>
+                                <div id="b2c-status-breakdown" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card flex flex-col">
+                        <h3 class="text-2xl font-bold text-slate-100 mb-4">Top NDC Breakdown</h3>
+                        <div class="scrollable-pane pr-2 flex-grow" style="max-height: 520px; overflow-y: auto;" id="b2c-ndc-summary"></div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 id="b2c-detailed-title" class="text-xl font-bold text-slate-200">All Ageing Shipments</h3>
+                        <button class="copy-button bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-full" data-type="b2c">Copy Table Data</button>
+                    </div>
+                    <input type="text" class="magic-filter w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-slate-200 placeholder-slate-400" placeholder="Magic Filter: Search WBN, NDC, Status..." data-type="b2c">
+                    <div id="b2c-detailed-table" class="overflow-x-auto"></div>
+                </div>
+            </div>`;
+        resultsContainer.innerHTML = dashboardHtml;
+        renderBreakdownCards('b2c', 'aging_bucket', data.summary.ageBreakdown, 'b2c-ageing-breakdown', 'bg-red-900/30', 'text-red-300');
+        renderBreakdownCards('b2c', 'producttype', data.summary.productBreakdown, 'b2c-product-breakdown', 'bg-green-900/30', 'text-green-300');
+        renderBreakdownCards('b2c', 'status', data.summary.statusBreakdown, 'b2c-status-breakdown', 'bg-yellow-900/30', 'text-yellow-300');
+        renderRightPaneSummary('b2c', 'ndc', 'NDC', data.ndcSummary, 'b2c-ndc-summary');
+        renderB2CTable(data.detailedWBNs, 'All Ageing Shipments');
+    }
+
+    function renderB2CTable(wbnData, title) {
+        const container = document.getElementById('b2c-detailed-table');
+        const titleEl = document.getElementById('b2c-detailed-title');
+        const count = wbnData ? wbnData.length : 0;
+        titleEl.textContent = `${title} ( ${count} WBNs )`;
+
+        if (count === 0) {
+            container.innerHTML = `<p class="text-slate-400 p-4">No data available.</p>`;
+            return;
         }
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th data-type="b2c" data-sort-key="wbn">WBN <span class="sort-icon">▲</span></th>
+                    <th data-type="b2c" data-sort-key="sd_dif">Ageing (hrs) <span class="sort-icon">▲</span></th>
+                    <th data-type="b2c" data-sort-key="ndc">NDC <span class="sort-icon">▲</span></th>
+                    <th data-type="b2c" data-sort-key="producttype">Product Type <span class="sort-icon">▲</span></th>
+                    <th data-type="b2c" data-sort-key="status">Status <span class="sort-icon">▲</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${wbnData.map(wbn => `
+                    <tr>
+                        <td><a href="${WBN_BASE_URL}${wbn.wbn}" target="_blank" class="text-blue-400 hover:underline">${wbn.wbn}</a>
+                            ${wbn.producttype === 'Heavy' ? '<span class="shipment-indicator indicator-h">H</span>' : ''}
+                            ${wbn.large ? '<span class="shipment-indicator indicator-l">L</span>' : ''}
+                        </td>
+                        <td>${parseFloat(wbn.sd_dif).toFixed(2)}</td>
+                        <td>${wbn.ndc}</td>
+                        <td>${wbn.producttype}</td>
+                        <td>${wbn.status}</td>
+                    </tr>`).join('')}
+            </tbody>`;
+        container.innerHTML = '';
+        container.appendChild(table);
+        updateSortIcons('b2c');
+    }
 
-        function createFilterRule() {
-            const ruleId = `rule-${Date.now()}`;
-            const ruleDiv = document.createElement('div');
-            ruleDiv.id = ruleId;
-            ruleDiv.className = 'grid grid-cols-1 md:grid-cols-4 gap-2 items-center';
-            const fields = {'Bag ID': 'bag_id', 'NTC': 'ntc_used', 'Lane Type': 'lane_type', 'PUT Status': 'put_status', 'PUT Location': 'putaway_location', 'PDT': 'pdt', 'Priority': 'priority', 'Age (Hours)': 'age_hours', 'Bag Status': 'bag_status'};
-            let fieldOptions = Object.keys(fields).map(name => `<option value="${fields[name]}">${name}</option>`).join('');
-            const operators = {'Text': [{val:'is', lbl:'is'}, {val:'is not', lbl:'is not'}, {val:'contains', lbl:'contains'}], 'Numeric': [{val:'>', lbl:'>'}, {val:'<', lbl:'<'}, {val:'==', lbl:'='}, {val:'>=', lbl:'>='}, {val:'<=', lbl:'<='}]};
-            ruleDiv.innerHTML = `<select name="field" class="p-2 border rounded-md bg-white">${fieldOptions}</select><select name="operator" class="p-2 border rounded-md bg-white"></select><div name="value-container" class="col-span-1 md:col-span-1"></div><button class="bg-red-500 text-white px-2 py-1 rounded-md justify-self-end text-xs">Remove</button>`;
-            filterRulesContainer.appendChild(ruleDiv);
-            const fieldSelect = ruleDiv.querySelector('select[name="field"]'), opSelect = ruleDiv.querySelector('select[name="operator"]'), valContainer = ruleDiv.querySelector('div[name="value-container"]');
-            const updateOperatorsAndValue = () => {
-                const selectedField = fieldSelect.value;
-                const isNumeric = selectedField === 'age_hours';
-                opSelect.innerHTML = (isNumeric ? operators.Numeric : operators.Text).map(op => `<option value="${op.val}">${op.lbl}</option>`).join('');
-                if (!window.currentAnalysisData) return;
-                const uniqueValues = [...new Set(window.currentAnalysisData.detailed_data.map(item => item[selectedField]).filter(Boolean))];
-                if (!isNumeric && uniqueValues.length < 100 && uniqueValues.length > 0) { 
-                    valContainer.innerHTML = `<input name="value" list="list-${ruleId}" class="p-2 border rounded-md w-full" placeholder="Enter value..."><datalist id="list-${ruleId}">${uniqueValues.map(v => `<option value="${v}"></option>`).join('')}</datalist>`;
-                } else {
-                    valContainer.innerHTML = `<input name="value" type="${isNumeric ? 'number' : 'text'}" class="p-2 border rounded-md w-full" placeholder="Enter value...">`;
-                }
-            };
-            fieldSelect.addEventListener('change', updateOperatorsAndValue);
-            ruleDiv.querySelector('button').addEventListener('click', () => ruleDiv.remove());
-            updateOperatorsAndValue();
+    function renderB2BDashboard(data) {
+        const dashboardId = 'b2b-dashboard';
+        const dashboardHtml = `
+            <div id="${dashboardId}" class="space-y-8 dashboard-instance">
+                <h2 class="text-3xl font-bold text-slate-100 border-b border-slate-700 pb-2">B2B (To Connect) Dashboard</h2>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div class="card">
+                        <h3 class="text-2xl font-bold text-slate-100 mb-4">Pending WBNs Summary</h3>
+                        <div class="space-y-4">
+                            <div class="summary-card text-center bg-slate-700/50 rounded-lg p-4" data-type="b2b" data-filter-key="all">
+                                <p class="text-sm font-medium text-blue-400">Total Pending WBNs</p>
+                                <p class="text-4xl font-bold text-white mt-2">${data.summary.totalWBNs}</p>
+                            </div>
+                            <div id="b2b-controllable-breakdown"></div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Ageing Breakdown</h4>
+                                <div id="b2b-ageing-breakdown" class="grid grid-cols-2 sm:grid-cols-4 gap-4"></div>
+                            </div>
+                            <div>
+                                <h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Put Remark Breakdown</h4>
+                                <div id="b2b-put-breakdown" class="grid grid-cols-1 sm:grid-cols-3 gap-4"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="space-y-8">
+                        <div class="card flex flex-col">
+                            <h3 class="text-xl font-bold text-slate-100 mb-1">Top NTC Breakdown</h3>
+                            <p class="text-xs text-slate-400 mb-3">(Controllable Ageing Only)</p>
+                            <div class="scrollable-pane pr-2 flex-grow" style="max-height: 220px; overflow-y: auto;" id="b2b-ntc-summary"></div>
+                        </div>
+                        <div class="card flex flex-col">
+                            <h3 class="text-xl font-bold text-slate-100 mb-1">Top Client Breakdown</h3>
+                            <p class="text-xs text-slate-400 mb-3">(Controllable Ageing Only)</p>
+                            <div class="scrollable-pane pr-2 flex-grow" style="max-height: 220px; overflow-y: auto;" id="b2b-client-summary"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 id="b2b-detailed-title" class="text-xl font-bold text-slate-200">All Pending Shipments</h3>
+                        <button class="copy-button bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 px-4 rounded-full" data-type="b2b">Copy Table Data</button>
+                    </div>
+                     <input type="text" class="magic-filter w-full bg-slate-700 border border-slate-600 rounded-md p-2 text-slate-200 placeholder-slate-400" placeholder="Magic Filter: Search WBN, NTC, Client, Remark..." data-type="b2b">
+                    <div id="b2b-detailed-table" class="overflow-x-auto"></div>
+                </div>
+            </div>`;
+        resultsContainer.innerHTML = dashboardHtml;
+        
+        const controllableContainer = document.getElementById('b2b-controllable-breakdown');
+        const controllableGroups = data.summary.controllableBreakdown.reduce((acc, item) => {
+            const key = item.controllable_remark;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(item);
+            return acc;
+        }, {});
+
+        let controllableHtml = '<h4 class="text-xs font-bold uppercase text-slate-400 mb-2 tracking-wider">Controllable Breakdown</h4>';
+        for (const [remark, items] of Object.entries(controllableGroups)) {
+            const total = items.reduce((sum, i) => sum + i.count, 0);
+            controllableHtml += `
+                <div class="border border-slate-700 rounded-lg p-3">
+                    <div class="summary-card flex justify-between items-center" data-type="b2b" data-filter-key="controllable_remark" data-filter-value="${remark}">
+                        <span class="font-bold text-slate-200">${remark}</span>
+                        <span class="font-bold text-xl text-blue-400">${total}</span>
+                    </div>
+                    <div class="pl-4 mt-2 space-y-1">
+                        ${items.map(item => `
+                            <div class="summary-card flex justify-between items-center text-sm" data-type="b2b" data-filter-key="sub_remark" data-filter-value="${item.sub_remark}">
+                                <span class="text-slate-300">${item.sub_remark}</span>
+                                <span class="text-slate-100 font-medium">${item.count}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
         }
+        controllableContainer.innerHTML = controllableHtml;
 
-        function applyMagicFilter() {
-            const logic = document.getElementById('filter-logic-selector').value;
-            const rules = [];
-            filterRulesContainer.querySelectorAll('.grid').forEach(ruleDiv => {
-                const field = ruleDiv.querySelector('select[name="field"]').value, operator = ruleDiv.querySelector('select[name="operator"]').value, value = ruleDiv.querySelector('input[name="value"]').value;
-                if (value) { rules.push({ field, operator, value }); }
-            });
-            let filteredData = window.currentAnalysisData.detailed_data;
-            if (rules.length > 0) {
-                 filteredData = filteredData.filter(row => {
-                    const checkRule = (rule) => {
-                        const rowValue = row[rule.field];
-                        if(rowValue === null || rowValue === undefined) return false;
-                        let value = rule.field === 'age_hours' ? parseFloat(rule.value) : rule.value;
-                        switch (rule.operator) {
-                            case 'is': return rowValue == value; case 'is not': return rowValue != value;
-                            case 'contains': return String(rowValue).toLowerCase().includes(String(value).toLowerCase());
-                            case '>': return rowValue > value; case '<': return rowValue < value;
-                            case '==': return rowValue == value; case '>=': return rowValue >= value;
-                            case '<=': return rowValue <= value; default: return false;
-                        }
-                    };
-                    if (logic === 'AND') return rules.every(checkRule);
-                    else return rules.some(checkRule);
-                 });
+        renderBreakdownCards('b2b', 'ageing_bucket_hrs', data.summary.ageingBreakdown, 'b2b-ageing-breakdown', 'bg-red-900/30', 'text-red-300');
+        renderBreakdownCards('b2b', 'put_remarks', data.summary.putBreakdown, 'b2b-put-breakdown', 'bg-yellow-900/30', 'text-yellow-300');
+        renderRightPaneSummary('b2b', 'ntc', 'NTC', data.ntcSummary, 'b2b-ntc-summary');
+        renderRightPaneSummary('b2b', 'client', 'Client', data.clientSummary, 'b2b-client-summary');
+        renderB2BTable(data.detailedWBNs, 'All Pending Shipments');
+    }
+    
+    function renderB2BTable(wbnData, title) {
+        const container = document.getElementById('b2b-detailed-table');
+        const titleEl = document.getElementById('b2b-detailed-title');
+        const copyBtn = document.querySelector('#b2b-dashboard .copy-button');
+        const count = wbnData ? wbnData.length : 0;
+        titleEl.textContent = `${title} ( ${count} WBNs )`;
+        copyBtn.classList.toggle('hidden', title === 'All Pending Shipments');
+
+        if (count === 0) {
+            container.innerHTML = `<p class="text-slate-400 p-4">No data available for this selection.</p>`;
+            return;
+        }
+        const table = document.createElement('table');
+        table.className = 'data-table';
+        table.innerHTML = `
+            <thead>
+                <tr>
+                    <th data-type="b2b" data-sort-key="wbn">WBN <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="ntc">NTC <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="ageing_days">Ageing (Days) <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="box_count">Box Count <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="remark_combined">Remark <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="cs_sr">CS SR <span class="sort-icon">▲</span></th>
+                    <th data-type="b2b" data-sort-key="put_combined">Put Status <span class="sort-icon">▲</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${wbnData.map(wbn => `
+                    <tr>
+                        <td><a href="${WBN_BASE_URL}${wbn.wbn}" target="_blank" class="text-blue-400 hover:underline">${wbn.wbn}</a></td>
+                        <td>${wbn.ntc}</td>
+                        <td>${wbn.ageing_days.toFixed(0)}</td>
+                        <td>${wbn.box_count}</td>
+                        <td>${wbn.remark_combined}</td>
+                        <td>${wbn.cs_sr}</td>
+                        <td>${wbn.put_combined}</td>
+                    </tr>`).join('')}
+            </tbody>`;
+        container.innerHTML = '';
+        container.appendChild(table);
+        updateSortIcons('b2b');
+    }
+
+    // --- GENERIC RENDERERS ---
+    function renderBreakdownCards(type, key, breakdownData, containerId, cardColor, textColor) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        if (!breakdownData || Object.keys(breakdownData).length === 0) return;
+        for (const [item, count] of Object.entries(breakdownData)) {
+            const card = document.createElement('div');
+            card.className = `summary-card text-center p-3 rounded-lg ${cardColor}`;
+            card.dataset.type = type;
+            card.dataset.filterKey = key;
+            card.dataset.filterValue = item;
+            card.innerHTML = `<p class="text-sm font-medium ${textColor}">${String(item).replace(/_/g, '-').replace('gt', '> ')}</p><p class="text-2xl font-bold ${textColor} mt-1">${count}</p>`;
+            container.appendChild(card);
+        }
+    }
+
+    function renderRightPaneSummary(type, key, title, data, containerId) {
+        const container = document.getElementById(containerId);
+        if (!data || data.length === 0) {
+            container.innerHTML = `<p class="text-slate-400 p-4">No ${title} data available.</p>`;
+            return;
+        }
+        const table = document.createElement('table');
+        table.className = 'data-table text-sm';
+        table.innerHTML = `
+            <thead><tr><th>${title}</th><th>Total</th><th>>96h</th></tr></thead>
+            <tbody>
+                ${data.map(row => `
+                    <tr class="summary-row cursor-pointer hover:bg-slate-700" data-type="${type}" data-key="${key}" data-value="${row[key]}">
+                        <td class="font-bold text-slate-200">${row[key]}</td>
+                        <td>${row.total_wbns || row.total_ageing_wbns}</td>
+                        <td class="${row.age_gt_96 > 0 ? 'text-red-400 font-bold' : ''}">${row.age_gt_96}</td>
+                    </tr>`).join('')}
+            </tbody>`;
+        container.innerHTML = '';
+        container.appendChild(table);
+    }
+    
+    // --- EVENT LISTENERS ---
+    resultsContainer.addEventListener('input', (e) => {
+        if(e.target.classList.contains('magic-filter')) {
+            clearTimeout(magicFilterDebounce);
+            magicFilterDebounce = setTimeout(() => {
+                const type = e.target.dataset.type;
+                const searchTerm = e.target.value.toLowerCase();
+                let dataToFilter = (type === 'b2c' ? fullB2CData : fullB2BData).detailedWBNs;
+                
+                const filtered = dataToFilter.filter(row => {
+                    if(type === 'b2c') {
+                        return row.wbn.includes(searchTerm) ||
+                               row.ndc.toLowerCase().includes(searchTerm) ||
+                               row.producttype.toLowerCase().includes(searchTerm) ||
+                               row.status.toLowerCase().includes(searchTerm);
+                    } else { // b2b
+                        return row.wbn.includes(searchTerm) ||
+                               row.ntc.toLowerCase().includes(searchTerm) ||
+                               row.client.toLowerCase().includes(searchTerm) ||
+                               row.remark_combined.toLowerCase().includes(searchTerm);
+                    }
+                });
+
+                const title = searchTerm ? `Search results for "${e.target.value}"` : (type === 'b2c' ? 'All Ageing Shipments' : 'All Pending Shipments');
+                if(type === 'b2c') renderB2CTable(filtered, title);
+                else renderB2BTable(filtered, title);
+
+            }, 300);
+        }
+    });
+
+    resultsContainer.addEventListener('click', (e) => {
+        const summaryTarget = e.target.closest('.summary-card, .summary-row');
+        if(summaryTarget) {
+            const type = summaryTarget.dataset.type;
+            const filterKey = summaryTarget.dataset.key || summaryTarget.dataset.filterKey;
+            const filterValue = summaryTarget.dataset.value || summaryTarget.dataset.filterValue;
+
+            const magicFilterInput = document.querySelector(`#${type}-dashboard .magic-filter`);
+            if(magicFilterInput) magicFilterInput.value = '';
+
+            if (type === 'b2c') {
+                let filteredData = fullB2CData.detailedWBNs;
+                if (filterKey !== 'all') {
+                    filteredData = filteredData.filter(wbn => String(wbn[filterKey]) === filterValue);
+                }
+                const title = filterKey === 'all' ? 'All Ageing Shipments' : `Shipments for ${filterKey.toUpperCase()}: ${filterValue}`;
+                renderB2CTable(sortData(type, filteredData, currentSorts[type].key, currentSorts[type].order), title);
+            } else if (type === 'b2b') {
+                let filteredData = fullB2BData.detailedWBNs;
+                if (filterKey !== 'all') {
+                    filteredData = filteredData.filter(wbn => String(wbn[filterKey]) === filterValue);
+                }
+                const title = filterKey === 'all' ? 'All Pending Shipments' : `Shipments for ${filterKey.toUpperCase()}: ${filterValue}`;
+                renderB2BTable(sortData(type, filteredData, currentSorts[type].key, currentSorts[type].order), title);
             }
-            let shipmentCount = 0, bagCount = 0;
-            filteredData.forEach(row => {
-                if (row.bag_id && /^\d+$/.test(row.bag_id)) { shipmentCount++; } else { bagCount++; }
-            });
-            const countText = `(${shipmentCount} Shipments | ${bagCount} Bags)`;
-            const titleText = rules.length > 0 ? `${rules.length} Magic Filter(s) Applied` : 'All In-Center Shipments';
-            dynamicViewTitle.textContent = `Detailed View: ${titleText} ${countText}`;
-            renderDetailedTable(filteredData);
+            return;
+        }
+
+        const th = e.target.closest('th[data-sort-key]');
+        if (th) {
+            const { type, sortKey } = th.dataset;
+            const current = currentSorts[type];
+            const order = (current.key === sortKey && current.order === 'desc') ? 'asc' : 'desc';
+            currentSorts[type] = { key: sortKey, order: order };
+
+            const title = document.getElementById(`${type}-detailed-title`).textContent.split(' (')[0];
+            const wbnElements = document.querySelectorAll(`#${type}-detailed-table tbody tr`);
+            const fullDataset = (type === 'b2b' ? fullB2BData : fullB2CData).detailedWBNs;
+            
+            const currentWBNsOnScreen = Array.from(wbnElements).map(row => {
+                const wbnValue = row.cells[0].textContent.trim();
+                return fullDataset.find(d => d.wbn == wbnValue);
+            }).filter(Boolean);
+
+            if (type === 'b2c') {
+                renderB2CTable(sortData(type, currentWBNsOnScreen, sortKey, order), title);
+            } else if (type === 'b2b') {
+                renderB2BTable(sortData(type, currentWBNsOnScreen, sortKey, order), title);
+            }
+            return;
         }
         
-        // Initial call
-        checkServerStatus();
+        const copyBtn = e.target.closest('.copy-button');
+        if(copyBtn) {
+            openCopyModal(copyBtn.dataset.type);
+        }
+    });
+    
+    // --- COPY MODAL LOGIC ---
+    function openCopyModal(type) {
+        const table = document.querySelector(`#${type}-detailed-table table`);
+        if (!table) return;
+
+        const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim().replace(' ▲', ''));
+        copyColumnCheckboxes.innerHTML = headers.map((header, index) => `
+            <label class="flex items-center space-x-2 text-slate-300 cursor-pointer">
+                <input type="checkbox" checked class="form-checkbox bg-slate-700 border-slate-500 rounded text-blue-500" data-index="${index}" data-header="${header}">
+                <span>${header}</span>
+            </label>
+        `).join('');
+
+        if (type === 'b2b') {
+            b2bCopyFilters.classList.remove('hidden');
+        } else {
+            b2bCopyFilters.classList.add('hidden');
+        }
+        
+        copyModal.dataset.type = type;
+        copyModal.classList.remove('hidden');
+        copyModal.classList.add('flex');
     }
-    document.addEventListener('DOMContentLoaded', initializeApp);
-    </script>
+
+    cancelCopyBtn.addEventListener('click', () => {
+        copyModal.classList.add('hidden');
+        copyModal.classList.remove('flex');
+    });
+    
+    b2bCopyFilters.addEventListener('click', (e) => {
+        if(e.target.classList.contains('copy-filter-btn')) {
+            b2bCopyFilters.querySelectorAll('.copy-filter-btn').forEach(btn => btn.classList.remove('active'));
+            e.target.classList.add('active');
+        }
+    });
+
+    confirmCopyBtn.addEventListener('click', () => {
+        const type = copyModal.dataset.type;
+        const table = document.querySelector(`#${type}-detailed-table table`);
+        if (!table) return;
+        
+        const selectedIndices = Array.from(copyColumnCheckboxes.querySelectorAll('input:checked')).map(cb => parseInt(cb.dataset.index));
+        const selectedHeaders = Array.from(copyColumnCheckboxes.querySelectorAll('input:checked')).map(cb => cb.dataset.header);
+
+        let rowsToCopy = Array.from(table.querySelectorAll('tbody tr'));
+
+        if (type === 'b2b') {
+            const filterType = b2bCopyFilters.querySelector('.active').dataset.filter;
+            if (filterType !== 'Both') {
+                const remarkIndex = Array.from(table.querySelectorAll('thead th')).findIndex(th => th.dataset.sortKey === 'remark_combined');
+                if (remarkIndex !== -1) {
+                    rowsToCopy = rowsToCopy.filter(row => {
+                        const remark = row.cells[remarkIndex].textContent;
+                        return remark.toLowerCase().startsWith(filterType.toLowerCase());
+                    });
+                }
+            }
+        }
+
+        const dataToCopy = rowsToCopy.map(row => {
+            return selectedIndices.map(index => row.cells[index].textContent.trim()).join('\t');
+        }).join('\n');
+
+        const finalString = `${selectedHeaders.join('\t')}\n${dataToCopy}`;
+
+        const textarea = document.createElement('textarea');
+        textarea.value = finalString;
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+
+        copyModal.classList.add('hidden');
+        copyModal.classList.remove('flex');
+        
+        const originalCopyBtn = document.querySelector(`#${type}-dashboard .copy-button`);
+        if (originalCopyBtn) {
+            originalCopyBtn.textContent = 'Copied!';
+            setTimeout(() => { originalCopyBtn.textContent = 'Copy Table Data'; }, 2000);
+        }
+    });
+
+
+    // --- HELPERS ---
+    function sortData(type, data, key, order) {
+        return [...data].sort((a, b) => {
+            let valA = a[key] === null || a[key] === undefined ? '' : a[key];
+            let valB = b[key] === null || b[key] === undefined ? '' : b[key];
+            if (key === 'sd_dif' || key === 'ageing_days') {
+                valA = parseFloat(valA);
+                valB = parseFloat(valB);
+            }
+            if (typeof valA === 'number' && typeof valB === 'number') {
+                return order === 'asc' ? valA - valB : valB - valA;
+            }
+            valA = String(valA).toLowerCase();
+            valB = String(valB).toLowerCase();
+            if (valA < valB) return order === 'asc' ? -1 : 1;
+            if (valA > valB) return order === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+
+    function updateSortIcons(type) {
+        document.querySelectorAll(`#${type}-dashboard th[data-sort-key]`).forEach(h => {
+            h.classList.remove('sorted-asc', 'sorted-desc');
+            const sortKey = h.dataset.sortKey;
+            if (currentSorts[type].key === sortKey) {
+                h.classList.add(currentSorts[type].order === 'asc' ? 'sorted-asc' : 'sorted-desc');
+            }
+        });
+    }
+
+    function showMessage(msg, isError) {
+        messageArea.innerHTML = msg;
+        messageArea.className = `mt-4 text-center p-3 rounded-md ${isError ? 'text-red-200 bg-red-900/40' : 'text-slate-300'}`;
+    }
+});
+</script>
+
 </body>
 </html>
